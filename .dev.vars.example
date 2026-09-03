@@ -1,0 +1,16 @@
+# Copie para .dev.vars (NÃO versionar) e preencha.
+# JSON completo da service account do GCP, em UMA linha.
+GCP_SA_KEY={"type":"service_account","project_id":"studio-7861914720-de430","private_key_id":"...","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n","client_email":"ddlab-ads-bq@studio-7861914720-de430.iam.gserviceaccount.com","client_id":"...","token_uri":"https://oauth2.googleapis.com/token"}
+
+# Projeto e dataset do BigQuery
+GCP_PROJECT_ID=studio-7861914720-de430
+BQ_DATASET=mcc_ddlab_google_ads
+BQ_MCC_SUFFIX=9123420378
+
+# Cloudflare Access (preencher depois de criar a Access Application).
+# Em dev pode deixar vazio para pular a verificação de JWT.
+CF_ACCESS_TEAM_DOMAIN=
+CF_ACCESS_AUD=
+
+# Token simples para proteger POST /api/refresh quando chamado fora do Access (ex.: cron externo). Opcional.
+REFRESH_TOKEN=

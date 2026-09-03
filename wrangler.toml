@@ -1,0 +1,34 @@
+name = "ddlab-ads-intelligence"
+main = "worker/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# SPA estática servida pelo Worker
+[assets]
+directory = "dist/client"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# ETL diário — 06:00 America/Sao_Paulo = 09:00 UTC
+[triggers]
+crons = ["0 9 * * *"]
+
+# Banco pré-agregado. Rode:  wrangler d1 create ddlab-ads
+# e cole o database_id retornado aqui.
+[[d1_databases]]
+binding = "DB"
+database_name = "ddlab-ads"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+# Vars não-secretas (secrets vão por `wrangler secret put`)
+[vars]
+GCP_PROJECT_ID = "studio-7861914720-de430"
+BQ_DATASET = "mcc_ddlab_google_ads"
+BQ_MCC_SUFFIX = "9123420378"
+# Preencher depois de criar a Access Application:
+CF_ACCESS_TEAM_DOMAIN = ""
+CF_ACCESS_AUD = ""
+
+[observability]
+enabled = true
