@@ -9,3 +9,5 @@ npm-debug.log*
 .idea/
 service-account*.json
 *.key.json
+
+*.tsbuildinfo
