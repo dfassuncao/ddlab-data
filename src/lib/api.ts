@@ -47,4 +47,6 @@ export const api = {
   annotations: (account: string) => get<any>(`/annotations?account=${account}`),
   addAnnotation: (body: { account: string; day: string; text: string }) =>
     post<any>("/annotations", body),
+  analysisLatest: (account: string) => get<any>(`/analysis?account=${account}`),
+  analysisGenerate: (q: RangeQuery) => post<any>(`/analysis${qs(q)}`),
 };

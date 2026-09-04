@@ -2,6 +2,7 @@ import { NavLink, Route, Routes, Navigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./lib/api";
 import { Overview } from "./pages/Overview";
+import { AiAnalysis } from "./pages/AiAnalysis";
 import { ReportPage } from "./pages/ReportPage";
 import { Schedule } from "./pages/Schedule";
 import { Waste } from "./pages/Waste";
@@ -10,6 +11,7 @@ import { Settings } from "./pages/Settings";
 
 const NAV = [
   { to: "/", label: "Visão geral", end: true },
+  { to: "/ai-analysis", label: "Análise IA" },
   { to: "/campaigns", label: "Campanhas" },
   { to: "/keywords", label: "Palavras‑chave" },
   { to: "/search-terms", label: "Termos de busca" },
@@ -58,6 +60,7 @@ export default function App() {
       <main className="mx-auto max-w-[1400px] px-5 py-6">
         <Routes>
           <Route path="/" element={<Overview />} />
+          <Route path="/ai-analysis" element={<AiAnalysis />} />
           <Route path="/campaigns" element={<ReportPage kind="campaigns" title="Campanhas" />} />
           <Route path="/keywords" element={<ReportPage kind="keywords" title="Palavras‑chave" />} />
           <Route

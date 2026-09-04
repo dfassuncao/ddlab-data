@@ -54,6 +54,10 @@ npm run db:seed
 # secret da service account (cole o JSON inteiro quando pedir)
 npx wrangler secret put GCP_SA_KEY
 
+# opcional: chave da Anthropic para a página "Análise IA" (console.anthropic.com/settings/keys —
+# conta própria com billing, chamada de API paga e separada da assinatura do Claude Code)
+npx wrangler secret put ANTHROPIC_API_KEY
+
 # build do frontend + deploy do Worker
 npm run deploy
 ```

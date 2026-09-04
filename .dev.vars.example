@@ -14,3 +14,8 @@ CF_ACCESS_AUD=
 
 # Token simples para proteger POST /api/refresh quando chamado fora do Access (ex.: cron externo). Opcional.
 REFRESH_TOKEN=
+
+# Análise IA (página "Análise IA"). Chave da conta Anthropic (console.anthropic.com/settings/keys),
+# com billing próprio — é uma chamada de API paga, separada da assinatura do Claude Code.
+ANTHROPIC_API_KEY=
+ANTHROPIC_MODEL=claude-sonnet-5

@@ -29,6 +29,8 @@ BQ_MCC_SUFFIX = "9123420378"
 # Preencher depois de criar a Access Application:
 CF_ACCESS_TEAM_DOMAIN = ""
 CF_ACCESS_AUD = ""
+# Modelo usado na Análise IA (chave via `wrangler secret put ANTHROPIC_API_KEY`)
+ANTHROPIC_MODEL = "claude-sonnet-5"
 
 [observability]
 enabled = true
