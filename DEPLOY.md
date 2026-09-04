@@ -9,7 +9,7 @@ Ordem: **GCP service account → GitHub → Cloudflare (D1 + secrets + deploy) �
 No Console GCP, projeto `studio-7861914720-de430`:
 
 1. **IAM e Admin → Contas de serviço → Criar**.
-   - Nome: `ddlab-ads-bq`
+   - Nome: `ddlab-data-bq`
    - Papéis: **BigQuery Data Viewer** e **BigQuery Job User**.
 2. Aba **Chaves → Adicionar chave → JSON**. Baixa o arquivo `xxx.json`.
 3. Guarde o conteúdo — vira o secret `GCP_SA_KEY` (JSON inteiro em uma linha).
@@ -44,7 +44,7 @@ npm install
 npx wrangler login
 
 # cria o banco e mostra um database_id
-npx wrangler d1 create ddlab-ads
+npx wrangler d1 create ddlab-data
 ```
 
 Cole o `database_id` retornado em `wrangler.toml` (campo `database_id`).
@@ -61,7 +61,7 @@ npx wrangler secret put GCP_SA_KEY
 npm run deploy
 ```
 
-Isso publica em `https://ddlab-ads-intelligence.<seu-subdominio>.workers.dev`.
+Isso publica em `https://ddlab-data.<seu-subdominio>.workers.dev`.
 
 Primeira carga de dados (uma conta por vez para não estourar tempo):
 

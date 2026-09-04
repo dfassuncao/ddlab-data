@@ -1,4 +1,4 @@
-name = "ddlab-ads-intelligence"
+name = "ddlab-data"
 main = "worker/index.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
@@ -13,11 +13,11 @@ not_found_handling = "single-page-application"
 [triggers]
 crons = ["0 9 * * *"]
 
-# Banco pré-agregado. Rode:  wrangler d1 create ddlab-ads
+# Banco pré-agregado. Rode:  wrangler d1 create ddlab-data
 # e cole o database_id retornado aqui.
 [[d1_databases]]
 binding = "DB"
-database_name = "ddlab-ads"
+database_name = "ddlab-data"
 database_id = "REPLACE_WITH_D1_DATABASE_ID"
 migrations_dir = "migrations"
 

@@ -1,6 +1,6 @@
 # Copie para .dev.vars (NÃO versionar) e preencha.
 # JSON completo da service account do GCP, em UMA linha.
-GCP_SA_KEY={"type":"service_account","project_id":"studio-7861914720-de430","private_key_id":"...","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n","client_email":"ddlab-ads-bq@studio-7861914720-de430.iam.gserviceaccount.com","client_id":"...","token_uri":"https://oauth2.googleapis.com/token"}
+GCP_SA_KEY={"type":"service_account","project_id":"studio-7861914720-de430","private_key_id":"...","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n","client_email":"ddlab-data-bq@studio-7861914720-de430.iam.gserviceaccount.com","client_id":"...","token_uri":"https://oauth2.googleapis.com/token"}
 
 # Projeto e dataset do BigQuery
 GCP_PROJECT_ID=studio-7861914720-de430

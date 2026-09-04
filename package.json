@@ -1,5 +1,5 @@
 {
-  "name": "ddlab-ads-intelligence",
+  "name": "ddlab-data",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,10 +10,10 @@
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy",
     "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.worker.json && tsc -p tsconfig.node.json",
-    "db:migrate": "wrangler d1 migrations apply ddlab-ads --remote",
-    "db:migrate:local": "wrangler d1 migrations apply ddlab-ads --local",
-    "db:seed": "wrangler d1 execute ddlab-ads --remote --file=./seed/accounts.sql",
-    "db:seed:local": "wrangler d1 execute ddlab-ads --local --file=./seed/accounts.sql",
+    "db:migrate": "wrangler d1 migrations apply ddlab-data --remote",
+    "db:migrate:local": "wrangler d1 migrations apply ddlab-data --local",
+    "db:seed": "wrangler d1 execute ddlab-data --remote --file=./seed/accounts.sql",
+    "db:seed:local": "wrangler d1 execute ddlab-data --local --file=./seed/accounts.sql",
     "etl:once": "wrangler dev --test-scheduled --port 8787"
   },
   "dependencies": {

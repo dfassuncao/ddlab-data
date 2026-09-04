@@ -11,3 +11,7 @@ service-account*.json
 *.key.json
 
 *.tsbuildinfo
+
+# chave da service account do GCP (nome do arquivo baixado)
+studio-*-*.json
+*-de430-*.json
