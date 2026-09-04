@@ -3,8 +3,8 @@ import { api } from "../lib/api";
 import { usePage } from "../lib/usePage";
 import { PageHeader, QueryState } from "../components/PageHeader";
 import { DataTable, type Column } from "../components/DataTable";
-import { metricCols } from "../lib/columns";
-import { int } from "../lib/format";
+import { metricCols, qualityCol } from "../lib/columns";
+import { brl, int, pct } from "../lib/format";
 
 type Row = Record<string, any>;
 
@@ -27,13 +27,27 @@ const EXTRA: Record<string, Column<Row>[]> = {
   "search-terms": [{ key: "campaign", header: "Campanha", render: (r) => r.campaign ?? "—" }],
   ads: [
     { key: "ad_group_id", header: "Grupo", render: (r) => r.ad_group_id ?? "—" },
+    { key: "ad_type", header: "Tipo", render: (r) => r.ad_type ?? "—" },
     { key: "campaign", header: "Campanha", render: (r) => r.campaign ?? "—" },
   ],
   audiences: [{ key: "dimension", header: "Dimensão", render: (r) => r.dimension ?? "—" }],
-  "landing-pages": [
-    { key: "mobile_speed", header: "Mobile speed", align: "right", render: (r) => int(r.mobile_speed) },
-  ],
 };
+
+// landing-pages: o transfer não traz conversão nessa tabela — só tráfego + velocidade.
+const LP_COLS: Column<Row>[] = [
+  { key: "impressions", header: "Impr.", align: "right", render: (r) => int(r.impressions) },
+  { key: "clicks", header: "Cliques", align: "right", render: (r) => int(r.clicks) },
+  { key: "ctr", header: "CTR", align: "right", render: (r) => pct(r.ctr) },
+  { key: "cost", header: "Custo", align: "right", render: (r) => brl(r.cost) },
+  { key: "cpc", header: "CPC", align: "right", render: (r) => brl(r.cpc) },
+  {
+    key: "mobile_speed",
+    header: "Mobile speed",
+    align: "right",
+    render: (r) => (r.mobile_speed == null ? "—" : int(r.mobile_speed)),
+    sortValue: (r) => r.mobile_speed ?? -1,
+  },
+];
 
 function downloadNegativesCsv(rows: Row[]) {
   const header = "Campaign,Keyword,Match Type,Level";
@@ -99,7 +113,11 @@ export function ReportPage({
             columns={[
               { key: "label", header: LABELS[kind] ?? "Item", render: (r) => r.label || "—" },
               ...(EXTRA[kind] ?? []),
-              ...metricCols(cur),
+              ...(kind === "landing-pages"
+                ? LP_COLS
+                : kind === "keywords"
+                  ? [...metricCols(cur), qualityCol()]
+                  : metricCols(cur)),
             ]}
           />
         </>

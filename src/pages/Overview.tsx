@@ -6,7 +6,7 @@ import { KpiCard } from "../components/KpiCard";
 import { TrendChart } from "../components/TrendChart";
 import { FreshnessBadge } from "../components/FreshnessBadge";
 import { DataTable } from "../components/DataTable";
-import { metricCols, isCols } from "../lib/columns";
+import { metricCols } from "../lib/columns";
 import { brl, dec, int, pct } from "../lib/format";
 
 export function Overview() {
@@ -76,7 +76,6 @@ export function Overview() {
                   ),
                 },
                 ...metricCols(cur),
-                ...isCols(),
               ]}
             />
           </div>

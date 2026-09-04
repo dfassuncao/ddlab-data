@@ -14,7 +14,7 @@ const NUM_COLS: Record<string, string[]> = {
     "budget_lost_is",
     "rank_lost_is",
   ],
-  fact_keyword_daily: ["impressions", "clicks", "cost", "conversions", "conversions_value"],
+  fact_keyword_daily: ["impressions", "clicks", "cost", "conversions", "conversions_value", "quality_score"],
   fact_searchterm_daily: ["impressions", "clicks", "cost", "conversions", "conversions_value"],
   fact_geo_daily: ["impressions", "clicks", "cost", "conversions", "conversions_value"],
   fact_hour_daily: ["impressions", "clicks", "cost", "conversions", "conversions_value", "hour"],

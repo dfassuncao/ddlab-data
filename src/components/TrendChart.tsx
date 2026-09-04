@@ -28,7 +28,14 @@ export function TrendChart({ data }: { data: TrendPoint[] }) {
             labelFormatter={(l) => shortDate(String(l))}
           />
           <Legend />
-          <Bar yAxisId="l" dataKey="cost" name="Custo" fill="#bfdbfe" radius={[3, 3, 0, 0]} />
+          <Bar
+            yAxisId="l"
+            dataKey="cost"
+            name="Custo"
+            fill="#bfdbfe"
+            radius={[3, 3, 0, 0]}
+            isAnimationActive={false}
+          />
           <Line
             yAxisId="r"
             type="monotone"
@@ -37,6 +44,7 @@ export function TrendChart({ data }: { data: TrendPoint[] }) {
             stroke="#2563eb"
             strokeWidth={2}
             dot={false}
+            isAnimationActive={false}
           />
         </ComposedChart>
       </ResponsiveContainer>

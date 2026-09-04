@@ -1,5 +1,5 @@
 import type { Column } from "../components/DataTable";
-import { brl, int, dec, pct, pctFrac } from "./format";
+import { brl, int, dec, pct } from "./format";
 
 type Row = Record<string, any>;
 
@@ -27,19 +27,10 @@ export const metricCols = (currency = "BRL"): Column<Row>[] => [
   },
 ];
 
-export const isCols = (): Column<Row>[] => [
-  {
-    key: "search_is",
-    header: "Impr. Share",
-    align: "right",
-    render: (r) => pctFrac(r.search_is),
-    sortValue: (r) => r.search_is ?? -1,
-  },
-  {
-    key: "budget_lost_is",
-    header: "IS perd. verba",
-    align: "right",
-    render: (r) => pctFrac(r.budget_lost_is),
-    sortValue: (r) => r.budget_lost_is ?? -1,
-  },
-];
+export const qualityCol = (): Column<Row> => ({
+  key: "quality_score",
+  header: "QS",
+  align: "right",
+  render: (r) => (r.quality_score == null ? "—" : dec(r.quality_score, 0)),
+  sortValue: (r) => r.quality_score ?? -1,
+});

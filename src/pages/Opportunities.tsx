@@ -3,7 +3,7 @@ import { api } from "../lib/api";
 import { usePage } from "../lib/usePage";
 import { PageHeader, QueryState } from "../components/PageHeader";
 import { DataTable } from "../components/DataTable";
-import { brl, dec, int, pctFrac } from "../lib/format";
+import { brl, dec, int } from "../lib/format";
 
 export function Opportunities() {
   const { accounts, account, f } = usePage();
@@ -28,22 +28,22 @@ export function Opportunities() {
         <>
           <section>
             <h2 className="mb-2 text-sm font-semibold text-slate-700">
-              Campanhas limitadas por orçamento (com conversão)
+              Campanhas mais eficientes — CPA abaixo da média da conta
+              {d.account_cpa != null && (
+                <span className="ml-2 font-normal text-slate-400">
+                  (média {brl(d.account_cpa, cur)})
+                </span>
+              )}
             </h2>
             <DataTable
-              rows={d.budget_limited}
+              rows={d.efficient}
               rowKey={(r) => r.label}
-              initialSort={{ key: "budget_lost_is", dir: "desc" }}
+              initialSort={{ key: "cpa", dir: "asc" }}
               columns={[
                 { key: "label", header: "Campanha", render: (r) => r.label },
                 { key: "cost", header: "Custo", align: "right", render: (r) => brl(r.cost, cur) },
                 { key: "conversions", header: "Conv.", align: "right", render: (r) => dec(r.conversions, 1) },
-                {
-                  key: "budget_lost_is",
-                  header: "IS perdido (verba)",
-                  align: "right",
-                  render: (r) => pctFrac(r.budget_lost_is),
-                },
+                { key: "cpa", header: "CPA", align: "right", render: (r) => brl(r.cpa, cur) },
               ]}
             />
           </section>

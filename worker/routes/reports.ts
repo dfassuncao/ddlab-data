@@ -317,15 +317,25 @@ reports.get("/opportunities", async (c) => {
   const { from, to } = resolveRange(c.req.query("from"), c.req.query("to"));
   const binds = [account!.id, from, to];
 
-  const budgetLimited = await q(
+  // Sem impression share no transfer: "eficientes" = CPA abaixo da média da conta, com volume.
+  const [accAvg] = await q<{ cpa: number }>(
+    c.env,
+    `SELECT (SUM(cost) / NULLIF(SUM(conversions),0)) AS cpa
+     FROM fact_campaign_daily WHERE account_id=? AND day>=? AND day<=?`,
+    binds,
+  );
+  const avgCpa = Number((accAvg as any)?.cpa ?? 0);
+  const efficient = await q(
     c.env,
     `SELECT COALESCE(d.name, f.campaign_id) AS label, SUM(f.cost) AS cost,
-       SUM(f.conversions) AS conversions, AVG(f.budget_lost_is) AS budget_lost_is
+       SUM(f.conversions) AS conversions,
+       (SUM(f.cost) / NULLIF(SUM(f.conversions),0)) AS cpa
      FROM fact_campaign_daily f LEFT JOIN dim_campaign d ON d.account_id=f.account_id AND d.campaign_id=f.campaign_id
      WHERE f.account_id=? AND f.day>=? AND f.day<=?
-     GROUP BY f.campaign_id HAVING AVG(f.budget_lost_is) > 0.05 AND SUM(f.conversions) > 0
-     ORDER BY budget_lost_is DESC`,
-    binds,
+     GROUP BY f.campaign_id
+     HAVING SUM(f.conversions) >= 2 AND (? = 0 OR (SUM(f.cost) / NULLIF(SUM(f.conversions),0)) < ?)
+     ORDER BY cpa ASC`,
+    [...binds, avgCpa, avgCpa || 1e12],
   );
   const convertingTerms = await q(
     c.env,
@@ -348,11 +358,12 @@ reports.get("/opportunities", async (c) => {
   return c.json({
     account,
     range: { from, to },
-    budget_limited: budgetLimited.map((r: any) => ({
+    account_cpa: avgCpa ? round(avgCpa, 2) : null,
+    efficient: efficient.map((r: any) => ({
       label: r.label,
       cost: round(r.cost),
       conversions: round(r.conversions, 2),
-      budget_lost_is: round(r.budget_lost_is, 4),
+      cpa: r.cpa != null ? round(r.cpa, 2) : null,
     })),
     converting_terms: convertingTerms.map((r: any) => ({
       label: r.label,

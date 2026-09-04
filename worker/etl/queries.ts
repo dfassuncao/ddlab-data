@@ -3,11 +3,12 @@ import { tbl } from "../bq";
 
 /**
  * Cada fato é uma query BigQuery cujas COLUNAS já saem com o nome exato
- * da coluna correspondente na tabela D1 (facilita o upsert genérico).
+ * da coluna da tabela D1 (facilita o upsert genérico).
  *
- * Se o transfer do Google Ads usar um nome de coluna diferente numa conta,
- * o ETL registra o erro em `meta_refresh` e segue com os outros fatos.
- * Para descobrir o nome real: GET /api/introspect?table=p_ads_XxxStats
+ * Nomes de coluna validados contra o dataset real da MCC 9123420378 em 2026-09.
+ * Se uma conta trouxer schema diferente, o fato aparece com erro em
+ * `meta_refresh` e o ETL segue com os outros. Descubra o nome real com
+ * GET /api/introspect?table=p_ads_XxxStats_9123420378
  */
 
 export interface FactSpec {
@@ -15,17 +16,9 @@ export interface FactSpec {
   table: string;
   pk: string[];
   sql: (env: Env) => string;
-  /**
-   * replace  = DELETE (account_id + day no range + deleteFilter) e reinsere  [default]
-   * update   = UPDATE por PK (enriquece colunas, não apaga)
-   * upsert   = INSERT OR REPLACE sem DELETE (dimensões sem data)
-   */
   mode?: "replace" | "update" | "upsert";
-  /** cláusula extra no DELETE quando vários fatos compartilham a mesma tabela */
   deleteFilter?: string;
-  /** janela padrão de dias (o cron diário usa uma janela menor) */
   lookbackDays: number;
-  /** só roda para contas com Shopping/PMax */
   shoppingOnly?: boolean;
 }
 
@@ -40,8 +33,12 @@ const BASE_METRICS = `
 const WHERE = `WHERE customer_id = @customer_id AND segments_date >= @start_date`;
 const HAVING_NONZERO = `HAVING SUM(metrics_impressions) > 0`;
 
-const LIGHT = 400; // campanha / hora — poucos registros, histórico longo
-const HEAVY = 120; // keyword / termo / geo / anúncio — muitos registros
+const LIGHT = 400;
+const HEAVY = 120;
+
+/** snapshot mais recente de uma tabela de dimensão do transfer */
+const latest = (env: Env, name: string) =>
+  `(SELECT MAX(_DATA_DATE) FROM ${tbl(env, name)} WHERE customer_id = @customer_id)`;
 
 export const FACTS: FactSpec[] = [
   {
@@ -59,23 +56,6 @@ export const FACTS: FactSpec[] = [
       GROUP BY day, campaign_id`,
   },
   {
-    fact: "campaign_is",
-    table: "fact_campaign_daily",
-    pk: ["account_id", "day", "campaign_id"],
-    mode: "update",
-    lookbackDays: LIGHT,
-    sql: (env) => `
-      SELECT
-        segments_date AS day,
-        CAST(campaign_id AS STRING) AS campaign_id,
-        ROUND(SAFE_DIVIDE(SUM(metrics_search_impression_share * metrics_impressions), SUM(metrics_impressions)), 4)              AS search_is,
-        ROUND(SAFE_DIVIDE(SUM(metrics_search_budget_lost_impression_share * metrics_impressions), SUM(metrics_impressions)), 4)  AS budget_lost_is,
-        ROUND(SAFE_DIVIDE(SUM(metrics_search_rank_lost_impression_share * metrics_impressions), SUM(metrics_impressions)), 4)    AS rank_lost_is
-      FROM ${tbl(env, "p_ads_CampaignStats")}
-      ${WHERE}
-      GROUP BY day, campaign_id`,
-  },
-  {
     fact: "dim_campaign",
     table: "dim_campaign",
     pk: ["account_id", "campaign_id"],
@@ -88,8 +68,7 @@ export const FACTS: FactSpec[] = [
         ANY_VALUE(campaign_status) AS status,
         ANY_VALUE(campaign_advertising_channel_type) AS channel_type
       FROM ${tbl(env, "ads_Campaign")}
-      WHERE customer_id = @customer_id
-        AND _DATA_DATE = (SELECT MAX(_DATA_DATE) FROM ${tbl(env, "ads_Campaign")} WHERE customer_id = @customer_id)
+      WHERE customer_id = @customer_id AND _DATA_DATE = ${latest(env, "ads_Campaign")}
       GROUP BY campaign_id`,
   },
   {
@@ -98,18 +77,35 @@ export const FACTS: FactSpec[] = [
     pk: ["account_id", "day", "criterion_id"],
     lookbackDays: HEAVY,
     sql: (env) => `
+      WITH k AS (
+        SELECT
+          segments_date AS day,
+          campaign_id, ad_group_id,
+          ad_group_criterion_criterion_id AS criterion_id,
+          ${BASE_METRICS}
+        FROM ${tbl(env, "p_ads_KeywordBasicStats")}
+        ${WHERE}
+        GROUP BY day, campaign_id, ad_group_id, criterion_id
+        ${HAVING_NONZERO}
+      ),
+      d AS (
+        SELECT
+          ad_group_criterion_criterion_id AS criterion_id,
+          ANY_VALUE(ad_group_criterion_keyword_text) AS keyword_text,
+          ANY_VALUE(ad_group_criterion_keyword_match_type) AS match_type,
+          ANY_VALUE(ad_group_criterion_quality_info_quality_score) AS quality_score
+        FROM ${tbl(env, "ads_Keyword")}
+        WHERE customer_id = @customer_id AND _DATA_DATE = ${latest(env, "ads_Keyword")}
+        GROUP BY criterion_id
+      )
       SELECT
-        segments_date AS day,
-        CAST(campaign_id AS STRING) AS campaign_id,
-        CAST(ad_group_id AS STRING) AS ad_group_id,
-        CAST(ad_group_criterion_criterion_id AS STRING) AS criterion_id,
-        ANY_VALUE(ad_group_criterion_keyword_text) AS keyword_text,
-        ANY_VALUE(ad_group_criterion_keyword_match_type) AS match_type,
-        ${BASE_METRICS}
-      FROM ${tbl(env, "p_ads_KeywordBasicStats")}
-      ${WHERE}
-      GROUP BY day, campaign_id, ad_group_id, criterion_id
-      ${HAVING_NONZERO}`,
+        k.day,
+        CAST(k.campaign_id AS STRING) AS campaign_id,
+        CAST(k.ad_group_id AS STRING) AS ad_group_id,
+        CAST(k.criterion_id AS STRING) AS criterion_id,
+        d.keyword_text, d.match_type, d.quality_score,
+        k.impressions, k.clicks, k.cost, k.conversions, k.conversions_value
+      FROM k LEFT JOIN d USING (criterion_id)`,
   },
   {
     fact: "search_term",
@@ -136,7 +132,7 @@ export const FACTS: FactSpec[] = [
       SELECT
         segments_date AS day,
         CAST(campaign_id AS STRING) AS campaign_id,
-        CAST(segments_geo_target_city AS STRING) AS location_id,
+        CAST(segments_geo_target_most_specific_location AS STRING) AS location_id,
         ${BASE_METRICS}
       FROM ${tbl(env, "p_ads_GeoStats")}
       ${WHERE}
@@ -185,17 +181,32 @@ export const FACTS: FactSpec[] = [
     pk: ["account_id", "day", "ad_id"],
     lookbackDays: HEAVY,
     sql: (env) => `
+      WITH s AS (
+        SELECT
+          segments_date AS day,
+          campaign_id, ad_group_id,
+          ad_group_ad_ad_id AS ad_id,
+          ${BASE_METRICS}
+        FROM ${tbl(env, "p_ads_AdBasicStats")}
+        ${WHERE}
+        GROUP BY day, campaign_id, ad_group_id, ad_id
+        ${HAVING_NONZERO}
+      ),
+      d AS (
+        SELECT ad_group_ad_ad_id AS ad_id,
+          ANY_VALUE(ad_group_ad_ad_type) AS ad_type
+        FROM ${tbl(env, "ads_Ad")}
+        WHERE customer_id = @customer_id AND _DATA_DATE = ${latest(env, "ads_Ad")}
+        GROUP BY ad_id
+      )
       SELECT
-        segments_date AS day,
-        CAST(campaign_id AS STRING) AS campaign_id,
-        CAST(ad_group_id AS STRING) AS ad_group_id,
-        CAST(ad_group_ad_ad_id AS STRING) AS ad_id,
-        ANY_VALUE(ad_group_ad_ad_type) AS ad_type,
-        ${BASE_METRICS}
-      FROM ${tbl(env, "p_ads_AdBasicStats")}
-      ${WHERE}
-      GROUP BY day, campaign_id, ad_group_id, ad_id
-      ${HAVING_NONZERO}`,
+        s.day,
+        CAST(s.campaign_id AS STRING) AS campaign_id,
+        CAST(s.ad_group_id AS STRING) AS ad_group_id,
+        CAST(s.ad_id AS STRING) AS ad_id,
+        d.ad_type,
+        s.impressions, s.clicks, s.cost, s.conversions, s.conversions_value
+      FROM s LEFT JOIN d USING (ad_id)`,
   },
   {
     fact: "audience_age",
@@ -203,17 +214,7 @@ export const FACTS: FactSpec[] = [
     pk: ["account_id", "day", "campaign_id", "dimension", "bucket"],
     deleteFilter: "dimension = 'age'",
     lookbackDays: HEAVY,
-    sql: (env) => `
-      SELECT
-        segments_date AS day,
-        CAST(campaign_id AS STRING) AS campaign_id,
-        'age' AS dimension,
-        ad_group_criterion_age_range_type AS bucket,
-        ${BASE_METRICS}
-      FROM ${tbl(env, "p_ads_AgeRangeBasicStats")}
-      ${WHERE}
-      GROUP BY day, campaign_id, bucket
-      ${HAVING_NONZERO}`,
+    sql: (env) => audienceSql(env, "age", "p_ads_AgeRangeBasicStats"),
   },
   {
     fact: "audience_gender",
@@ -221,17 +222,7 @@ export const FACTS: FactSpec[] = [
     pk: ["account_id", "day", "campaign_id", "dimension", "bucket"],
     deleteFilter: "dimension = 'gender'",
     lookbackDays: HEAVY,
-    sql: (env) => `
-      SELECT
-        segments_date AS day,
-        CAST(campaign_id AS STRING) AS campaign_id,
-        'gender' AS dimension,
-        ad_group_criterion_gender_type AS bucket,
-        ${BASE_METRICS}
-      FROM ${tbl(env, "p_ads_GenderBasicStats")}
-      ${WHERE}
-      GROUP BY day, campaign_id, bucket
-      ${HAVING_NONZERO}`,
+    sql: (env) => audienceSql(env, "gender", "p_ads_GenderBasicStats"),
   },
   {
     fact: "product",
@@ -251,6 +242,7 @@ export const FACTS: FactSpec[] = [
       ${HAVING_NONZERO}`,
   },
   {
+    // LandingPageStats do transfer NÃO traz conversões — só impr/cliques/custo/speed.
     fact: "landing_page",
     table: "fact_landingpage_daily",
     pk: ["account_id", "day", "url"],
@@ -260,10 +252,44 @@ export const FACTS: FactSpec[] = [
         segments_date AS day,
         landing_page_view_unexpanded_final_url AS url,
         CAST(ROUND(AVG(NULLIF(metrics_speed_score, 0))) AS INT64) AS mobile_speed,
-        ${BASE_METRICS}
+        SUM(metrics_impressions) AS impressions,
+        SUM(metrics_clicks)      AS clicks,
+        ROUND(SUM(${M}), 4)      AS cost,
+        0 AS conversions,
+        0 AS conversions_value
       FROM ${tbl(env, "p_ads_LandingPageStats")}
       ${WHERE}
       GROUP BY day, url
       ${HAVING_NONZERO}`,
   },
 ];
+
+function audienceSql(env: Env, dim: "age" | "gender", statsTable: string): string {
+  return `
+    WITH s AS (
+      SELECT
+        segments_date AS day,
+        campaign_id,
+        ad_group_criterion_criterion_id AS criterion_id,
+        ${BASE_METRICS}
+      FROM ${tbl(env, statsTable)}
+      ${WHERE}
+      GROUP BY day, campaign_id, criterion_id
+      ${HAVING_NONZERO}
+    ),
+    d AS (
+      SELECT
+        ad_group_criterion_criterion_id AS criterion_id,
+        ANY_VALUE(ad_group_criterion_display_name) AS bucket
+      FROM ${tbl(env, "ads_AdGroupCriterion")}
+      WHERE _DATA_DATE = (SELECT MAX(_DATA_DATE) FROM ${tbl(env, "ads_AdGroupCriterion")})
+      GROUP BY criterion_id
+    )
+    SELECT
+      s.day,
+      CAST(s.campaign_id AS STRING) AS campaign_id,
+      '${dim}' AS dimension,
+      COALESCE(d.bucket, CAST(s.criterion_id AS STRING)) AS bucket,
+      s.impressions, s.clicks, s.cost, s.conversions, s.conversions_value
+    FROM s LEFT JOIN d USING (criterion_id)`;
+}
