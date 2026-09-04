@@ -18,7 +18,7 @@ crons = ["0 9 * * *"]
 [[d1_databases]]
 binding = "DB"
 database_name = "ddlab-data"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "a6131f1a-55c4-452a-83df-f84721b73869"
 migrations_dir = "migrations"
 
 # Vars não-secretas (secrets vão por `wrangler secret put`)
