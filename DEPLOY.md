@@ -106,13 +106,15 @@ Teste: abrir a URL deve redirecionar para o login do Access. `curl` sem sessão 
 
 ## 5. Deploy automático no push
 
-**Opção A (recomendada) — Workers Builds:**
-Cloudflare → **Workers & Pages → seu Worker → Settings → Build → Connect** → escolha o repo GitHub e a branch `main`.
+**Já configurado: Workers Builds.**
+Cloudflare → **Workers & Pages → ddlab-data → Settings → Build** está conectado ao repo
+`dfassuncao/ddlab-data`, branch `main`. Todo push em `main` dispara um build.
 Build command: `npm run build` · Deploy command: `npx wrangler deploy`.
 
-**Opção B — GitHub Actions:** já existe `.github/workflows/deploy.yml`.
-Em GitHub → repo → Settings → Secrets and variables → Actions, adicione
-`CLOUDFLARE_API_TOKEN` (permissão *Edit Cloudflare Workers* + *D1 Edit*) e `CLOUDFLARE_ACCOUNT_ID`.
+Não existe workflow de GitHub Actions para deploy (removido de propósito, para não
+duplicar/disputar com o Workers Builds). Se precisar rodar migrations do D1 em CI,
+faça isso à parte com `wrangler d1 migrations apply ddlab-data --remote` — o
+Workers Builds só cuida do deploy do Worker, não do banco.
 
 ---
 
