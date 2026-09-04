@@ -5,6 +5,7 @@ export interface ClaudeResult {
   model: string;
   inputTokens: number;
   outputTokens: number;
+  stopReason: string | null;
 }
 
 /**
@@ -16,7 +17,7 @@ export async function callClaude(
   env: Env,
   system: string,
   userContent: string,
-  maxTokens = 2500,
+  maxTokens = 8000,
 ): Promise<ClaudeResult> {
   if (!env.ANTHROPIC_API_KEY) {
     throw new Error(
@@ -49,10 +50,21 @@ export async function callClaude(
     .map((b: any) => b.text)
     .join("\n");
 
+  const stopReason = json.stop_reason ?? null;
+  if (!text) {
+    // Aconteceu de bater o teto de tokens antes de emitir texto (ex.: em "thinking").
+    // Sobe um erro em vez de guardar uma análise vazia.
+    const blockTypes = (json.content ?? []).map((b: any) => b.type).join(",") || "nenhum";
+    throw new Error(
+      `Resposta sem texto (stop_reason=${stopReason}, blocos=[${blockTypes}], output_tokens=${json.usage?.output_tokens}). Tente aumentar max_tokens.`,
+    );
+  }
+
   return {
     text,
     model,
     inputTokens: json.usage?.input_tokens ?? 0,
     outputTokens: json.usage?.output_tokens ?? 0,
+    stopReason,
   };
 }
