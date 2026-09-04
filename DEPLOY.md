@@ -20,18 +20,15 @@ No Console GCP, projeto `studio-7861914720-de430`:
 
 ## 2. GitHub
 
+O repositório já está iniciado (branch `main`, commits feitos). Crie um repo **privado**
+vazio em github.com chamado `ddlab-data` (sem README), depois, na pasta do projeto
+(`01 - WEBSITES/DDLab Report`):
+
 ```bash
-cd "C:/Users/dfass/OneDrive/DANIEL/CLIENTES/Doin Motors/MCP Doin"
-git init
-git add .
-git commit -m "feat: ambiente de análise de Google Ads (Cloudflare + BigQuery)"
+git remote add origin https://github.com/SEU-USUARIO/ddlab-data.git
 ```
 
-Crie um repo vazio em github.com (ex.: `ddlab/ads-intelligence`, **privado**) e:
-
 ```bash
-git remote add origin https://github.com/ddlab/ads-intelligence.git
-git branch -M main
 git push -u origin main
 ```
 
