@@ -10,6 +10,12 @@ export interface Account {
   monthly_budget: number | null;
   has_shopping: boolean;
   active: boolean;
+  /** Perfil do cliente ideal: descrição livre (ICP, o que conta como lead bom, etc.) */
+  profile_notes: string | null;
+  /** Valor mínimo de conversão para considerar um lead "de ticket ideal" */
+  ideal_ticket_min: number | null;
+  /** Meta de leads/mês, usada como referência de volume */
+  lead_goal_monthly: number | null;
 }
 
 export interface Totals {

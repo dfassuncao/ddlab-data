@@ -5,6 +5,7 @@ import { PageHeader, QueryState } from "../components/PageHeader";
 import { KpiCard } from "../components/KpiCard";
 import { TrendChart } from "../components/TrendChart";
 import { FreshnessBadge } from "../components/FreshnessBadge";
+import { ProfileBanner } from "../components/ProfileBanner";
 import { DataTable } from "../components/DataTable";
 import { metricCols } from "../lib/columns";
 import { brl, dec, int, pct } from "../lib/format";
@@ -28,6 +29,7 @@ export function Overview() {
         f={f}
       />
       <QueryState q={q} />
+      {account && <ProfileBanner account={account} />}
       {d && (
         <>
           <div className="flex flex-wrap items-center justify-between gap-2">

@@ -355,10 +355,45 @@ reports.get("/opportunities", async (c) => {
     binds,
   );
 
+  // Cliente ideal: não é só CPA baixo — combina VOLUME de leads e VALOR gerado.
+  // Cada campanha ganha um score 0..1 = média entre (conversões / máx conversões)
+  // e (valor / máx valor) no período; a que tiver mais dos dois sobe no ranking.
+  const idealRaw = await q(
+    c.env,
+    `SELECT COALESCE(d.name, f.campaign_id) AS label, SUM(f.cost) AS cost,
+       SUM(f.conversions) AS conversions, SUM(f.conversions_value) AS conversions_value
+     FROM fact_campaign_daily f LEFT JOIN dim_campaign d ON d.account_id=f.account_id AND d.campaign_id=f.campaign_id
+     WHERE f.account_id=? AND f.day>=? AND f.day<=?
+     GROUP BY f.campaign_id
+     HAVING SUM(f.conversions) > 0`,
+    binds,
+  );
+  const maxConv = Math.max(1, ...idealRaw.map((r: any) => Number(r.conversions)));
+  const maxVal = Math.max(1, ...idealRaw.map((r: any) => Number(r.conversions_value)));
+  const idealTicket = account!.ideal_ticket_min;
+  const idealSegments = idealRaw
+    .map((r: any) => {
+      const conversions = Number(r.conversions);
+      const conversions_value = Number(r.conversions_value);
+      const ticket = conversions > 0 ? conversions_value / conversions : 0;
+      return {
+        label: r.label,
+        cost: round(r.cost),
+        conversions: round(conversions, 2),
+        conversions_value: round(conversions_value),
+        ticket_medio: round(ticket, 2),
+        below_ideal_ticket: idealTicket != null ? ticket < idealTicket : null,
+        score: round(0.5 * (conversions / maxConv) + 0.5 * (conversions_value / maxVal), 4),
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 20);
+
   return c.json({
     account,
     range: { from, to },
     account_cpa: avgCpa ? round(avgCpa, 2) : null,
+    ideal_segments: idealSegments,
     efficient: efficient.map((r: any) => ({
       label: r.label,
       cost: round(r.cost),
@@ -419,6 +454,9 @@ reports.post("/settings/account", async (c) => {
     monthly_budget?: number | null;
     has_shopping?: boolean;
     active?: boolean;
+    profile_notes?: string | null;
+    ideal_ticket_min?: number | null;
+    lead_goal_monthly?: number | null;
   }>();
   if (!body.id) return c.json({ error: "id obrigatório" }, 400);
   await c.env.DB.prepare(
@@ -426,7 +464,10 @@ reports.post("/settings/account", async (c) => {
        target_cpa = COALESCE(?, target_cpa),
        monthly_budget = COALESCE(?, monthly_budget),
        has_shopping = COALESCE(?, has_shopping),
-       active = COALESCE(?, active)
+       active = COALESCE(?, active),
+       profile_notes = COALESCE(?, profile_notes),
+       ideal_ticket_min = COALESCE(?, ideal_ticket_min),
+       lead_goal_monthly = COALESCE(?, lead_goal_monthly)
      WHERE id = ?`,
   )
     .bind(
@@ -434,6 +475,9 @@ reports.post("/settings/account", async (c) => {
       body.monthly_budget ?? null,
       body.has_shopping == null ? null : body.has_shopping ? 1 : 0,
       body.active == null ? null : body.active ? 1 : 0,
+      body.profile_notes ?? null,
+      body.ideal_ticket_min ?? null,
+      body.lead_goal_monthly ?? null,
       body.id,
     )
     .run();

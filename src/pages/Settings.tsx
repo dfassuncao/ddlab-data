@@ -22,6 +22,9 @@ export function Settings() {
   });
 
   const [edit, setEdit] = useState<Record<string, { target_cpa?: string; monthly_budget?: string }>>({});
+  const [profileEdit, setProfileEdit] = useState<
+    Record<string, { profile_notes?: string; ideal_ticket_min?: string; lead_goal_monthly?: string }>
+  >({});
 
   return (
     <div className="space-y-6">
@@ -92,6 +95,84 @@ export function Settings() {
               })}
             </tbody>
           </table>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="mb-1 text-sm font-semibold text-slate-700">Perfil do cliente ideal</h2>
+        <p className="mb-3 text-xs text-slate-500">
+          Descreva quem é o cliente ideal de cada conta (o que conta como lead bom, ticket médio,
+          região prioritária, etc.). Isso aparece junto das análises e alimenta o ranking de
+          "Segmentos ideais" em Oportunidades — que prioriza campanhas com{" "}
+          <strong>mais leads e maior valor gerado</strong>, não só CPA baixo.
+        </p>
+        <div className="grid gap-3 md:grid-cols-2">
+          {accounts.map((a) => {
+            const pe = profileEdit[a.id] ?? {};
+            return (
+              <div key={a.id} className="rounded-lg border border-slate-200 bg-white p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-sm font-medium">{a.name}</span>
+                  <button
+                    className="rounded bg-brand px-2.5 py-1 text-xs font-medium text-white"
+                    onClick={() =>
+                      save.mutate({
+                        id: a.id,
+                        profile_notes: pe.profile_notes ?? a.profile_notes ?? "",
+                        ideal_ticket_min:
+                          pe.ideal_ticket_min !== undefined
+                            ? Number(pe.ideal_ticket_min) || null
+                            : undefined,
+                        lead_goal_monthly:
+                          pe.lead_goal_monthly !== undefined
+                            ? Number(pe.lead_goal_monthly) || null
+                            : undefined,
+                      })
+                    }
+                  >
+                    Salvar
+                  </button>
+                </div>
+                <textarea
+                  className="mb-2 w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+                  rows={3}
+                  placeholder="Ex.: cliente ideal busca importados/seminovos de luxo em Santos; lead bom = telefone + interesse em modelo específico; desconsiderar quem pergunta sobre peças ou emprego."
+                  defaultValue={a.profile_notes ?? ""}
+                  onChange={(ev) =>
+                    setProfileEdit((s) => ({ ...s, [a.id]: { ...s[a.id], profile_notes: ev.target.value } }))
+                  }
+                />
+                <div className="flex gap-3 text-xs">
+                  <label className="flex items-center gap-1.5">
+                    Ticket ideal mín.
+                    <input
+                      className="w-24 rounded border border-slate-300 px-2 py-1"
+                      defaultValue={a.ideal_ticket_min ?? ""}
+                      onChange={(ev) =>
+                        setProfileEdit((s) => ({
+                          ...s,
+                          [a.id]: { ...s[a.id], ideal_ticket_min: ev.target.value },
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className="flex items-center gap-1.5">
+                    Meta leads/mês
+                    <input
+                      className="w-20 rounded border border-slate-300 px-2 py-1"
+                      defaultValue={a.lead_goal_monthly ?? ""}
+                      onChange={(ev) =>
+                        setProfileEdit((s) => ({
+                          ...s,
+                          [a.id]: { ...s[a.id], lead_goal_monthly: ev.target.value },
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
 
