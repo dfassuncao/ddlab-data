@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { api } from "../lib/api";
 import { usePage } from "../lib/usePage";
 import { PageHeader, QueryState } from "../components/PageHeader";
-import { ProfileBanner } from "../components/ProfileBanner";
 
 export function AiAnalysis() {
   const { accounts, account, f } = usePage();
@@ -36,7 +36,7 @@ export function AiAnalysis() {
     <div className="space-y-5">
       <PageHeader
         title="Análise IA"
-        subtitle="Leitura em linguagem natural dos dados do período, considerando o perfil do cliente ideal."
+        subtitle="Leitura dos dados do período como um analista faria, terminando num checklist de ações."
         accounts={accounts}
         f={f}
         actions={
@@ -49,12 +49,12 @@ export function AiAnalysis() {
           </button>
         }
       />
-      {account && <ProfileBanner account={account} />}
 
       <p className="text-xs text-slate-400">
         Cada clique em "Gerar análise" chama a API da Anthropic e consome créditos da sua conta —
         gere quando quiser uma leitura nova, não é automático. O período usado é o filtro acima
         ({f.from} a {f.to}).
+        {account?.profile_notes && " O briefing do cliente (Configurações) é considerado, mas não aparece aqui."}
       </p>
 
       <QueryState q={latest} />
@@ -79,8 +79,8 @@ export function AiAnalysis() {
             <span>· período {record.range_from} a {record.range_to}</span>
             <span>· modelo {record.model}</span>
           </div>
-          <article className="prose prose-sm prose-slate max-w-none prose-h2:mt-5 prose-h2:text-base prose-h2:font-semibold prose-headings:text-slate-800">
-            <ReactMarkdown>{record.content}</ReactMarkdown>
+          <article className="prose prose-sm prose-slate max-w-none prose-h2:mt-5 prose-h2:text-base prose-h2:font-semibold prose-headings:text-slate-800 prose-li:my-0.5">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{record.content}</ReactMarkdown>
           </article>
         </div>
       )}

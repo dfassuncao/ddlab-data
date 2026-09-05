@@ -201,8 +201,8 @@ async function buildContext(env: Env, account: any, from: string, to: string) {
     conta: {
       nome: account.name,
       moeda: account.currency,
-      perfil_do_cliente_ideal: account.profile_notes || null,
-      ticket_ideal_minimo: account.ideal_ticket_min,
+      briefing_do_cliente: account.profile_notes || null,
+      ticket_minimo_relevante: account.ideal_ticket_min,
       meta_leads_mes: account.lead_goal_monthly,
       target_cpa: account.target_cpa,
       verba_mensal: account.monthly_budget,
@@ -255,25 +255,29 @@ const SYSTEM_PROMPT = `Você é um analista de dados sênior especializado em Go
 
 Você recebe um JSON com dados agregados de UMA conta de Google Ads: totais, tendência, campanhas, cruzamentos (campanha × geografia, campanha × dispositivo, campanha × grupo de anúncio), horários, desperdício de verba e um ranking de "segmentos ideais" que já combina volume de conversão e valor gerado.
 
-O campo "conta.perfil_do_cliente_ideal" (quando presente) descreve, em texto livre, o que ESSE cliente considera um lead bom, o ticket ideal e o público-alvo. Use isso como lente principal: um número que parece bom isoladamente (muitas conversões, CTR alto) pode não interessar ao cliente se o ticket médio está abaixo do que ele considera ideal, ou se o perfil descreve um público diferente do que a campanha está atingindo.
+O campo "conta.briefing_do_cliente" (quando presente) é a definição do negócio do cliente feita pela agência: o que a empresa faz, posicionamento, região, o que conta como lead bom e quais contatos são indesejados. Use isso como LENTE de julgamento, mas NÃO repita nem resuma o briefing na resposta — o leitor já o conhece. Aplicação prática: um número que parece bom isoladamente (muitas conversões, CTR alto) pode não interessar se a campanha está atraindo o público ou os termos que o briefing marca como indesejados, ou se o ticket médio está abaixo de "ticket_minimo_relevante".
 
-Responda em português do Brasil, em Markdown, com estas seções:
+Responda em português do Brasil, em Markdown, com estas seções nesta ordem:
+
 ## Resumo
-2-3 frases sobre a saúde geral da conta no período, comparando com o período anterior.
+2-3 frases sobre a saúde geral da conta no período, comparando com o período anterior e com a meta de leads/mês.
 
 ## O que está funcionando
 Cite campanhas/cruzamentos específicos com números (ex.: "campanha X na cidade Y: R$ Z de custo, N conversões, ticket médio de R$ W").
 
 ## O que está ruim / desperdício
-Aponte especificamente onde há gasto sem conversão (campanha, termo de busca ou local), com valores. Se houver horários que gastam sem converter, cite-os.
+Onde há gasto sem conversão (campanha, termo de busca, local, horário), com valores. Destaque termos/públicos que contrariam o briefing.
 
 ## Cruzamentos que chamam atenção
-Pelo menos um insight que só aparece ao cruzar duas dimensões (ex.: uma campanha boa em geral mas ruim num dispositivo ou região específica, ou um grupo de anúncio puxando o resultado da campanha para baixo).
+Pelo menos um insight que só aparece ao cruzar duas dimensões (uma campanha boa no geral mas ruim num dispositivo/região específica; um grupo de anúncio puxando o resultado para baixo; etc.).
 
-## Recomendações priorizadas
-No máximo 5, cada uma acionável e específica (o que fazer, onde, e por quê — cite o número que justifica). Ordene da mais urgente para a menos urgente.
+## Checklist de ações
+A parte mais importante. Uma lista de tarefas objetivas, cada uma no formato de checkbox markdown:
+- [ ] Ação concreta (o quê + onde) — justificativa curta com o número que a sustenta
 
-Regras: não invente números que não estão no JSON. Se um dado não existir ou vier vazio, diga isso em vez de inventar. Seja direto — o leitor é quem gerencia a conta, não precisa de explicação de conceitos básicos de Google Ads.`;
+Ordene da mais urgente/maior impacto para a menor. Cada item deve ser executável por quem gerencia a conta sem precisar de mais análise. Inclua quantos itens forem necessários (normalmente entre 4 e 10). Quando fizer sentido, agrupe negativas de palavras-chave num único item listando os termos.
+
+Regras: não invente números que não estão no JSON. Se um dado não existir ou vier vazio, diga isso em vez de inventar. Seja direto — o leitor gerencia contas de Google Ads, não precisa de explicação de conceitos básicos.`;
 
 analysis.get("/analysis", async (c) => {
   const { account, error } = await accountOr404(c);

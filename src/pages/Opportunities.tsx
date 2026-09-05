@@ -3,7 +3,6 @@ import { api } from "../lib/api";
 import { usePage } from "../lib/usePage";
 import { PageHeader, QueryState } from "../components/PageHeader";
 import { DataTable } from "../components/DataTable";
-import { ProfileBanner } from "../components/ProfileBanner";
 import { brl, dec, int, pct } from "../lib/format";
 
 export function Opportunities() {
@@ -25,7 +24,6 @@ export function Opportunities() {
         f={f}
       />
       <QueryState q={q} />
-      {account && <ProfileBanner account={account} />}
       {d && (
         <>
           <section>
@@ -34,7 +32,7 @@ export function Opportunities() {
             </h2>
             <p className="mb-2 text-xs text-slate-500">
               Combina volume de conversões e valor gerado num score único (0 a 1). Se você definiu um
-              "ticket mínimo ideal" em Configurações, campanhas abaixo dele ficam marcadas.
+              "ticket mínimo relevante" em Configurações, campanhas abaixo dele ficam marcadas.
             </p>
             <DataTable
               rows={d.ideal_segments}
@@ -50,9 +48,9 @@ export function Opportunities() {
                       {r.below_ideal_ticket && (
                         <span
                           className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700"
-                          title="Ticket médio abaixo do mínimo ideal definido para a conta"
+                          title="Ticket médio abaixo do mínimo relevante definido para a conta"
                         >
-                          abaixo do ticket ideal
+                          abaixo do ticket mínimo
                         </span>
                       )}
                     </span>

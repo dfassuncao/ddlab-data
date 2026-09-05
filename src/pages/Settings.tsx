@@ -99,12 +99,12 @@ export function Settings() {
       </section>
 
       <section>
-        <h2 className="mb-1 text-sm font-semibold text-slate-700">Perfil do cliente ideal</h2>
+        <h2 className="mb-1 text-sm font-semibold text-slate-700">Briefing do cliente</h2>
         <p className="mb-3 text-xs text-slate-500">
-          Descreva quem é o cliente ideal de cada conta (o que conta como lead bom, ticket médio,
-          região prioritária, etc.). Isso aparece junto das análises e alimenta o ranking de
-          "Segmentos ideais" em Oportunidades — que prioriza campanhas com{" "}
-          <strong>mais leads e maior valor gerado</strong>, não só CPA baixo.
+          Definição do negócio de cada conta: o que a empresa faz, posicionamento, o que conta como
+          lead bom, contatos indesejados, região, etc. <strong>Não aparece nas telas de análise</strong>,
+          mas é enviado como contexto para a <strong>Análise IA</strong> julgar os números.
+          Os campos numéricos abaixo (ticket mínimo, meta de leads) alimentam os rankings de Oportunidades.
         </p>
         <div className="grid gap-3 md:grid-cols-2">
           {accounts.map((a) => {
@@ -135,8 +135,8 @@ export function Settings() {
                 </div>
                 <textarea
                   className="mb-2 w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
-                  rows={3}
-                  placeholder="Ex.: cliente ideal busca importados/seminovos de luxo em Santos; lead bom = telefone + interesse em modelo específico; desconsiderar quem pergunta sobre peças ou emprego."
+                  rows={6}
+                  placeholder="Ex.: loja de veículos novos e seminovos em Santos, foco em modelos de padrão superior. Lead bom = intenção real de compra/troca/financiamento. Ignorar: emprego, peças, oficina, aluguel, quem só quer informação técnica."
                   defaultValue={a.profile_notes ?? ""}
                   onChange={(ev) =>
                     setProfileEdit((s) => ({ ...s, [a.id]: { ...s[a.id], profile_notes: ev.target.value } }))
@@ -144,7 +144,7 @@ export function Settings() {
                 />
                 <div className="flex gap-3 text-xs">
                   <label className="flex items-center gap-1.5">
-                    Ticket ideal mín.
+                    Ticket mínimo relevante
                     <input
                       className="w-24 rounded border border-slate-300 px-2 py-1"
                       defaultValue={a.ideal_ticket_min ?? ""}
