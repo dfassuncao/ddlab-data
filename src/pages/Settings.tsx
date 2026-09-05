@@ -23,7 +23,10 @@ export function Settings() {
 
   const [edit, setEdit] = useState<Record<string, { target_cpa?: string; monthly_budget?: string }>>({});
   const [profileEdit, setProfileEdit] = useState<
-    Record<string, { profile_notes?: string; ideal_ticket_min?: string; lead_goal_monthly?: string }>
+    Record<
+      string,
+      { profile_notes?: string; ideal_ticket_min?: string; lead_goal_monthly?: string; competitors?: string }
+    >
   >({});
 
   return (
@@ -99,12 +102,13 @@ export function Settings() {
       </section>
 
       <section>
-        <h2 className="mb-1 text-sm font-semibold text-slate-700">Briefing do cliente</h2>
+        <h2 className="mb-1 text-sm font-semibold text-slate-700">Briefing &amp; concorrentes</h2>
         <p className="mb-3 text-xs text-slate-500">
-          Definição do negócio de cada conta: o que a empresa faz, posicionamento, o que conta como
-          lead bom, contatos indesejados, região, etc. <strong>Não aparece nas telas de análise</strong>,
-          mas é enviado como contexto para a <strong>Análise IA</strong> julgar os números.
-          Os campos numéricos abaixo (ticket mínimo, meta de leads) alimentam os rankings de Oportunidades.
+          <strong>Briefing</strong>: definição do negócio de cada conta (o que a empresa faz,
+          posicionamento, lead bom, contatos indesejados). Não aparece nas telas de análise, só vai
+          como contexto para a <strong>Análise IA</strong>. Os campos numéricos alimentam os rankings
+          de Oportunidades. <strong>Concorrentes</strong>: alimentam a aba <strong>Concorrentes</strong>{" "}
+          e a seção de concorrência da Análise IA.
         </p>
         <div className="grid gap-3 md:grid-cols-2">
           {accounts.map((a) => {
@@ -119,6 +123,7 @@ export function Settings() {
                       save.mutate({
                         id: a.id,
                         profile_notes: pe.profile_notes ?? a.profile_notes ?? "",
+                        competitors: pe.competitors ?? a.competitors ?? "",
                         ideal_ticket_min:
                           pe.ideal_ticket_min !== undefined
                             ? Number(pe.ideal_ticket_min) || null
@@ -170,6 +175,18 @@ export function Settings() {
                     />
                   </label>
                 </div>
+                <label className="mt-2 block text-xs text-slate-500">
+                  Concorrentes (um por linha — nome ou marca a rastrear nos termos de busca)
+                  <textarea
+                    className="mt-1 w-full rounded border border-slate-300 px-2 py-1.5 text-sm text-slate-800"
+                    rows={3}
+                    placeholder={"Ex.:\nMilazzo\nOsten Motors\nWebmotors"}
+                    defaultValue={a.competitors ?? ""}
+                    onChange={(ev) =>
+                      setProfileEdit((s) => ({ ...s, [a.id]: { ...s[a.id], competitors: ev.target.value } }))
+                    }
+                  />
+                </label>
               </div>
             );
           })}

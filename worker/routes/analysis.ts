@@ -4,6 +4,7 @@ import type { AccessUser } from "../auth";
 import { getAccount } from "../db";
 import { callClaude } from "../claude";
 import { resolveRange, previousRange, round } from "../kpi";
+import { analyzeCompetitors } from "../competitors";
 
 type Vars = { Variables: { user: AccessUser }; Bindings: Env };
 export const analysis = new Hono<Vars>();
@@ -197,6 +198,8 @@ async function buildContext(env: Env, account: any, from: string, to: string) {
     .sort((a, b) => b.score - a.score)
     .slice(0, 10);
 
+  const competicao = await analyzeCompetitors(env, account, from, to);
+
   return {
     conta: {
       nome: account.name,
@@ -248,6 +251,25 @@ async function buildContext(env: Env, account: any, from: string, to: string) {
       conversoes: M(r.conversoes, 1),
     })),
     segmentos_ideais_volume_e_valor: segmentosIdeais,
+    concorrencia: competicao.configured
+      ? {
+          observacao:
+            "Baseado nos termos de busca que mencionam cada concorrente (proxy). O Google não expõe o Auction Insights real via API/BigQuery.",
+          periodo_anterior: competicao.prev_range,
+          concorrentes: competicao.competitors.map((c) => ({
+            nome: c.name,
+            status: c.status,
+            custo_atual: c.cost_cur,
+            custo_anterior: c.cost_prev,
+            variacao_custo_pct: c.cost_delta_pct,
+            impressoes_atual: c.impressions_cur,
+            cliques_atual: c.clicks_cur,
+            conversoes_atual: c.conversions_cur,
+            termos: c.terms,
+          })),
+          termos_de_maior_custo_nao_classificados: competicao.unmapped_top,
+        }
+      : { configurado: false },
   };
 }
 
@@ -270,6 +292,9 @@ Onde há gasto sem conversão (campanha, termo de busca, local, horário), com v
 
 ## Cruzamentos que chamam atenção
 Pelo menos um insight que só aparece ao cruzar duas dimensões (uma campanha boa no geral mas ruim num dispositivo/região específica; um grupo de anúncio puxando o resultado para baixo; etc.).
+
+## Concorrência
+Use o bloco "concorrencia". Diga quais concorrentes cresceram, caíram, entraram (novos no período) ou saíram, com os valores de custo e a variação. Aponte se estamos gastando para defender nossa marca contra eles ou atacando a marca deles — e se isso faz sentido dado o briefing (ex.: o briefing pode dizer para não disputar certas marcas). Se houver termos de alto custo não classificados que parecem concorrentes, sugira adicioná-los à lista. Deixe claro que isto é um proxy pelos termos de busca, não o Auction Insights real. Se "concorrencia.configurado" for false, diga que nenhum concorrente foi cadastrado em Configurações e pule o resto da seção.
 
 ## Checklist de ações
 A parte mais importante. Uma lista de tarefas objetivas, cada uma no formato de checkbox markdown:

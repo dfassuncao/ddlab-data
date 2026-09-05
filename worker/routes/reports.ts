@@ -3,6 +3,7 @@ import type { Env } from "../env";
 import type { AccessUser } from "../auth";
 import { getAccount } from "../db";
 import { withKpis, resolveRange, previousRange, round } from "../kpi";
+import { analyzeCompetitors } from "../competitors";
 
 type Vars = { Variables: { user: AccessUser }; Bindings: Env };
 export const reports = new Hono<Vars>();
@@ -416,6 +417,14 @@ reports.get("/opportunities", async (c) => {
   });
 });
 
+reports.get("/competitors", async (c) => {
+  const { account, error } = await accountOr404(c);
+  if (error) return error;
+  const { from, to } = resolveRange(c.req.query("from"), c.req.query("to"));
+  const result = await analyzeCompetitors(c.env, account!, from, to);
+  return c.json({ account, ...result });
+});
+
 reports.get("/freshness", async (c) => {
   const acc = c.req.query("account");
   const rows = acc
@@ -457,6 +466,7 @@ reports.post("/settings/account", async (c) => {
     profile_notes?: string | null;
     ideal_ticket_min?: number | null;
     lead_goal_monthly?: number | null;
+    competitors?: string | null;
   }>();
   if (!body.id) return c.json({ error: "id obrigatório" }, 400);
   await c.env.DB.prepare(
@@ -467,7 +477,8 @@ reports.post("/settings/account", async (c) => {
        active = COALESCE(?, active),
        profile_notes = COALESCE(?, profile_notes),
        ideal_ticket_min = COALESCE(?, ideal_ticket_min),
-       lead_goal_monthly = COALESCE(?, lead_goal_monthly)
+       lead_goal_monthly = COALESCE(?, lead_goal_monthly),
+       competitors = COALESCE(?, competitors)
      WHERE id = ?`,
   )
     .bind(
@@ -478,6 +489,7 @@ reports.post("/settings/account", async (c) => {
       body.profile_notes ?? null,
       body.ideal_ticket_min ?? null,
       body.lead_goal_monthly ?? null,
+      body.competitors ?? null,
       body.id,
     )
     .run();

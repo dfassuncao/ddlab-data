@@ -16,6 +16,8 @@ export interface Account {
   ideal_ticket_min: number | null;
   /** Meta de leads/mês, usada como referência de volume */
   lead_goal_monthly: number | null;
+  /** Concorrentes (um por linha): nome/marca a rastrear nos termos de busca */
+  competitors: string | null;
 }
 
 export interface Totals {

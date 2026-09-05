@@ -40,6 +40,7 @@ export const api = {
   schedule: (q: RangeQuery) => get<any>(`/schedule${qs(q)}`),
   waste: (q: RangeQuery) => get<any>(`/waste${qs(q)}`),
   opportunities: (q: RangeQuery) => get<any>(`/opportunities${qs(q)}`),
+  competitors: (q: RangeQuery) => get<any>(`/competitors${qs(q)}`),
   freshness: (account?: string) => get<any>(`/freshness${account ? `?account=${account}` : ""}`),
   refresh: (account?: string, days?: number) =>
     post<any>(`/refresh?${account ? `account=${account}&` : ""}${days ? `days=${days}` : ""}`),
