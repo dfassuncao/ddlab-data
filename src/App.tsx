@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "./lib/api";
 import { Overview } from "./pages/Overview";
 import { AiAnalysis } from "./pages/AiAnalysis";
-import { Competitors } from "./pages/Competitors";
 import { ReportPage } from "./pages/ReportPage";
 import { Schedule } from "./pages/Schedule";
 import { Waste } from "./pages/Waste";
@@ -24,7 +23,6 @@ const NAV = [
   { to: "/landing-pages", label: "Landing pages" },
   { to: "/waste", label: "Desperdício" },
   { to: "/opportunities", label: "Oportunidades" },
-  { to: "/competitors", label: "Concorrentes" },
   { to: "/settings", label: "Configurações" },
 ];
 
@@ -80,7 +78,6 @@ export default function App() {
           />
           <Route path="/waste" element={<Waste />} />
           <Route path="/opportunities" element={<Opportunities />} />
-          <Route path="/competitors" element={<Competitors />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
