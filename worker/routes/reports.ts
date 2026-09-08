@@ -457,6 +457,8 @@ reports.post("/settings/account", async (c) => {
     profile_notes?: string | null;
     ideal_ticket_min?: number | null;
     lead_goal_monthly?: number | null;
+    ga4_dataset?: string | null;
+    ga4_key_events?: string | null;
   }>();
   if (!body.id) return c.json({ error: "id obrigatório" }, 400);
   await c.env.DB.prepare(
@@ -467,7 +469,9 @@ reports.post("/settings/account", async (c) => {
        active = COALESCE(?, active),
        profile_notes = COALESCE(?, profile_notes),
        ideal_ticket_min = COALESCE(?, ideal_ticket_min),
-       lead_goal_monthly = COALESCE(?, lead_goal_monthly)
+       lead_goal_monthly = COALESCE(?, lead_goal_monthly),
+       ga4_dataset = COALESCE(?, ga4_dataset),
+       ga4_key_events = COALESCE(?, ga4_key_events)
      WHERE id = ?`,
   )
     .bind(
@@ -478,6 +482,8 @@ reports.post("/settings/account", async (c) => {
       body.profile_notes ?? null,
       body.ideal_ticket_min ?? null,
       body.lead_goal_monthly ?? null,
+      body.ga4_dataset ?? null,
+      body.ga4_key_events ?? null,
       body.id,
     )
     .run();

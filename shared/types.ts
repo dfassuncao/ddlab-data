@@ -16,6 +16,10 @@ export interface Account {
   ideal_ticket_min: number | null;
   /** Meta de leads/mês, usada como referência de volume */
   lead_goal_monthly: number | null;
+  /** Dataset do BigQuery export do GA4 (ex.: analytics_123456789), no mesmo projeto GCP */
+  ga4_dataset: string | null;
+  /** Key events do GA4 a contar como conversão (separado por vírgula) */
+  ga4_key_events: string | null;
 }
 
 export interface Totals {

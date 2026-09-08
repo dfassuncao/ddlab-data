@@ -169,6 +169,35 @@ async function buildContext(env: Env, account: any, from: string, to: string) {
     binds,
   );
 
+  // GA4 por canal (atual vs anterior)
+  const ga4Chan = async (a: string, bb: string) =>
+    q<any>(
+      env,
+      `SELECT channel, SUM(sessions) sessions, SUM(engaged_sessions) engaged,
+              SUM(key_events) key_events, SUM(revenue) revenue
+       FROM fact_ga4_daily WHERE account_id=? AND day>=? AND day<=? GROUP BY channel`,
+      [account.id, a, bb],
+    );
+  const ga4Cur = await ga4Chan(from, to);
+  const ga4Prev = await ga4Chan(prev.from, prev.to);
+  const prevByChan = Object.fromEntries(ga4Prev.map((r: any) => [r.channel, r]));
+  const ga4 = ga4Cur.length
+    ? {
+        canais: ga4Cur.map((r: any) => {
+          const s = Number(r.sessions);
+          const p = prevByChan[r.channel];
+          return {
+            canal: r.channel,
+            sessoes: s,
+            sessoes_anterior: p ? Number(p.sessions) : 0,
+            engajamento_pct: s > 0 ? M((Number(r.engaged) / s) * 100, 1) : 0,
+            key_events: M(Number(r.key_events), 1),
+            receita: M(Number(r.revenue)),
+          };
+        }),
+      }
+    : { configurado: false as const };
+
   const idealRaw = await q<any>(
     env,
     `SELECT COALESCE(d.name, f.campaign_id) AS nome, SUM(f.cost) custo,
@@ -248,6 +277,7 @@ async function buildContext(env: Env, account: any, from: string, to: string) {
       conversoes: M(r.conversoes, 1),
     })),
     segmentos_ideais_volume_e_valor: segmentosIdeais,
+    ga4_por_canal: ga4,
   };
 }
 
@@ -279,15 +309,97 @@ Ordene da mais urgente/maior impacto para a menor. Cada item deve ser executáve
 
 Regras: não invente números que não estão no JSON. Se um dado não existir ou vier vazio, diga isso em vez de inventar. Seja direto — o leitor gerencia contas de Google Ads, não precisa de explicação de conceitos básicos.`;
 
+const DIAGNOSTICO_PROMPT = `Você é um analista de dados sênior de mídia paga + web analytics de uma agência (DDLab).
+
+Recebe um JSON com dados agregados de UMA conta: Google Ads (totais, campanhas, cruzamentos, horários, desperdício, segmentos) e, quando presente, GA4 por canal (sessões, engajamento, key events, receita). "conta.briefing_do_cliente" é a definição do negócio feita pela agência — use como lente de julgamento, NÃO a repita.
+
+Responda APENAS com um objeto JSON válido (sem markdown, sem cercas de código), no formato:
+
+{
+  "resumo": "2-3 frases sobre a saúde da conta no período vs anterior",
+  "findings": [
+    {
+      "categoria": "critico" | "desperdicio" | "oportunidade" | "escala" | "criativo" | "mensuracao",
+      "confianca": 0-100,
+      "titulo": "frase curta",
+      "evidencia": "1-2 frases com os números que sustentam",
+      "impacto": "efeito estimado, com número quando possível (ex.: '-18 leads/mês', 'Economia R$ 1.180')",
+      "acao": "o que fazer, específico e executável"
+    }
+  ],
+  "causal": [
+    { "mudanca": "o que mudou", "evidencia_cruzada": "quais fontes/dimensões cruzadas mostram isso", "efeito": "resultado observado com número", "confianca": 0-100, "proxima_acao": "próximo passo" }
+  ]
+}
+
+Regras: 4 a 8 findings, ordenados por severidade (critico/desperdicio primeiro) e impacto. Não invente números fora do JSON. Se GA4 não estiver configurado ("ga4_por_canal.configurado": false), diga isso num finding de categoria "mensuracao" e não fabrique métricas de sessão. "causal" pode ter 0 a 4 itens — só inclua relações realmente sustentadas pelos dados.`;
+
+async function latestByKind(env: Env, accountId: string, kind: string) {
+  const rows = await q<any>(
+    env,
+    `SELECT * FROM ai_analysis WHERE account_id = ? AND kind = ? ORDER BY generated_at DESC LIMIT 1`,
+    [accountId, kind],
+  );
+  return rows[0] ?? null;
+}
+
 analysis.get("/analysis", async (c) => {
   const { account, error } = await accountOr404(c);
   if (error) return error;
-  const rows = await q(
-    c.env,
-    `SELECT * FROM ai_analysis WHERE account_id = ? ORDER BY generated_at DESC LIMIT 1`,
-    [account!.id],
-  );
-  return c.json({ account, latest: rows[0] ?? null });
+  return c.json({ account, latest: await latestByKind(c.env, account!.id, "markdown") });
+});
+
+analysis.get("/diagnostico", async (c) => {
+  const { account, error } = await accountOr404(c);
+  if (error) return error;
+  const row = await latestByKind(c.env, account!.id, "diagnostico");
+  let parsed: unknown = null;
+  if (row?.content) {
+    try {
+      parsed = JSON.parse(row.content);
+    } catch {
+      parsed = null;
+    }
+  }
+  return c.json({ account, latest: row, data: parsed });
+});
+
+analysis.post("/diagnostico", async (c) => {
+  const { account, error } = await accountOr404(c);
+  if (error) return error;
+  const { from, to } = resolveRange(c.req.query("from"), c.req.query("to"));
+  const user = c.get("user");
+
+  let context: Awaited<ReturnType<typeof buildContext>>;
+  try {
+    context = await buildContext(c.env, account, from, to);
+  } catch (e) {
+    return c.json({ error: `Falha ao montar contexto: ${(e as Error).message}` }, 500);
+  }
+
+  try {
+    const result = await callClaude(
+      c.env,
+      DIAGNOSTICO_PROMPT,
+      `Dados agregados da conta "${account!.name}" (${from} a ${to}):\n\n${JSON.stringify(context)}`,
+    );
+    const clean = result.text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```$/i, "").trim();
+    let parsed: any;
+    try {
+      parsed = JSON.parse(clean);
+    } catch {
+      return c.json({ error: "IA não retornou JSON válido", raw: clean.slice(0, 500) }, 502);
+    }
+    await c.env.DB.prepare(
+      `INSERT INTO ai_analysis (account_id, range_from, range_to, model, content, input_tokens, output_tokens, generated_by, kind)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'diagnostico')`,
+    )
+      .bind(account!.id, from, to, result.model, clean, result.inputTokens, result.outputTokens, user.email)
+      .run();
+    return c.json({ account, range: { from, to }, data: parsed, model: result.model });
+  } catch (e) {
+    return c.json({ error: (e as Error).message }, 500);
+  }
 });
 
 analysis.post("/analysis", async (c) => {
@@ -310,8 +422,8 @@ analysis.post("/analysis", async (c) => {
       `Dados agregados da conta "${account!.name}" (${from} a ${to}):\n\n${JSON.stringify(context)}`,
     );
     await c.env.DB.prepare(
-      `INSERT INTO ai_analysis (account_id, range_from, range_to, model, content, input_tokens, output_tokens, generated_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO ai_analysis (account_id, range_from, range_to, model, content, input_tokens, output_tokens, generated_by, kind)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'markdown')`,
     )
       .bind(account!.id, from, to, result.model, result.text, result.inputTokens, result.outputTokens, user.email)
       .run();

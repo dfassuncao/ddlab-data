@@ -2,6 +2,7 @@ import type { Env } from "../env";
 import { runQuery } from "../bq";
 import { listAccounts, bulkInsert, bulkUpdate, chunk } from "../db";
 import { FACTS, type FactSpec } from "./queries";
+import { runGa4 } from "./ga4";
 
 const NUM_COLS: Record<string, string[]> = {
   fact_campaign_daily: [
@@ -108,40 +109,67 @@ export async function runEtl(env: Env, opts: EtlOptions = {}) {
   const results: Array<{ account: string; fact: string; status: string; rows: number; error?: string }> =
     [];
 
+  const writeMeta = async (
+    accountId: string,
+    fact: string,
+    status: string,
+    rows: number,
+    from: string,
+    error: string | null,
+  ) => {
+    await env.DB.prepare(
+      `INSERT OR REPLACE INTO meta_refresh
+         (account_id, fact, last_run_at, status, rows_written, data_from, data_to, error)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        accountId,
+        fact,
+        new Date().toISOString(),
+        status,
+        rows,
+        from || null,
+        error ? null : new Date().toISOString().slice(0, 10),
+        error,
+      )
+      .run();
+  };
+
   for (const account of accounts) {
     for (const spec of FACTS) {
       if (opts.facts?.length && !opts.facts.includes(spec.fact)) continue;
       if (spec.shoppingOnly && !account.has_shopping) continue;
 
       const lookback = opts.lookbackDays ?? spec.lookbackDays;
-      const now = new Date().toISOString();
       try {
         const { rows, from } = await runFact(env, spec, account, lookback);
-        await env.DB.prepare(
-          `INSERT OR REPLACE INTO meta_refresh
-             (account_id, fact, last_run_at, status, rows_written, data_from, data_to, error)
-           VALUES (?, ?, ?, 'ok', ?, ?, ?, NULL)`,
-        )
-          .bind(account.id, spec.fact, now, rows, from || null, new Date().toISOString().slice(0, 10))
-          .run();
+        await writeMeta(account.id, spec.fact, "ok", rows, from, null);
         results.push({ account: account.id, fact: spec.fact, status: "ok", rows });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        await env.DB.prepare(
-          `INSERT OR REPLACE INTO meta_refresh
-             (account_id, fact, last_run_at, status, rows_written, data_from, data_to, error)
-           VALUES (?, ?, ?, 'error', 0, NULL, NULL, ?)`,
-        )
-          .bind(account.id, spec.fact, now, msg.slice(0, 500))
-          .run();
+        await writeMeta(account.id, spec.fact, "error", 0, "", msg.slice(0, 500));
         results.push({ account: account.id, fact: spec.fact, status: "error", rows: 0, error: msg });
+      }
+    }
+
+    // GA4 (nível canal) — só se a conta tem ga4_dataset configurado.
+    if (!opts.facts?.length || opts.facts.includes("ga4")) {
+      const lookback = opts.lookbackDays ?? 400;
+      try {
+        const { status, rows, from } = await runGa4(env, account, lookback);
+        await writeMeta(account.id, "ga4", status, rows, from, null);
+        results.push({ account: account.id, fact: "ga4", status, rows });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        await writeMeta(account.id, "ga4", "error", 0, "", msg.slice(0, 500));
+        results.push({ account: account.id, fact: "ga4", status: "error", rows: 0, error: msg });
       }
     }
   }
 
   // Retenção: mantém 400 dias em cada fato.
   const cutoff = startDate(400);
-  for (const table of Object.keys(NUM_COLS)) {
+  for (const table of [...Object.keys(NUM_COLS), "fact_ga4_daily"]) {
     await env.DB.prepare(`DELETE FROM ${table} WHERE day < ?`).bind(cutoff).run();
   }
 

@@ -49,4 +49,8 @@ export const api = {
     post<any>("/annotations", body),
   analysisLatest: (account: string) => get<any>(`/analysis?account=${account}`),
   analysisGenerate: (q: RangeQuery) => post<any>(`/analysis${qs(q)}`),
+  decisionCenter: (q: RangeQuery) => get<any>(`/decision-center${qs(q)}`),
+  dataHealth: (account: string) => get<any>(`/data-health?account=${account}`),
+  diagnosticoLatest: (account: string) => get<any>(`/diagnostico?account=${account}`),
+  diagnosticoGenerate: (q: RangeQuery) => post<any>(`/diagnostico${qs(q)}`),
 };

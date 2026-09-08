@@ -23,7 +23,16 @@ export function Settings() {
 
   const [edit, setEdit] = useState<Record<string, { target_cpa?: string; monthly_budget?: string }>>({});
   const [profileEdit, setProfileEdit] = useState<
-    Record<string, { profile_notes?: string; ideal_ticket_min?: string; lead_goal_monthly?: string }>
+    Record<
+      string,
+      {
+        profile_notes?: string;
+        ideal_ticket_min?: string;
+        lead_goal_monthly?: string;
+        ga4_dataset?: string;
+        ga4_key_events?: string;
+      }
+    >
   >({});
 
   return (
@@ -127,6 +136,9 @@ export function Settings() {
                           pe.lead_goal_monthly !== undefined
                             ? Number(pe.lead_goal_monthly) || null
                             : undefined,
+                        ga4_dataset: pe.ga4_dataset !== undefined ? pe.ga4_dataset.trim() : undefined,
+                        ga4_key_events:
+                          pe.ga4_key_events !== undefined ? pe.ga4_key_events.trim() : undefined,
                       })
                     }
                   >
@@ -166,6 +178,30 @@ export function Settings() {
                           ...s,
                           [a.id]: { ...s[a.id], lead_goal_monthly: ev.target.value },
                         }))
+                      }
+                    />
+                  </label>
+                </div>
+                <div className="mt-2 space-y-1.5 border-t border-slate-100 pt-2 text-xs">
+                  <label className="block">
+                    GA4 — dataset do BigQuery export (mesmo projeto GCP)
+                    <input
+                      className="mt-0.5 w-full rounded border border-slate-300 px-2 py-1"
+                      placeholder="analytics_123456789"
+                      defaultValue={a.ga4_dataset ?? ""}
+                      onChange={(ev) =>
+                        setProfileEdit((s) => ({ ...s, [a.id]: { ...s[a.id], ga4_dataset: ev.target.value } }))
+                      }
+                    />
+                  </label>
+                  <label className="block">
+                    GA4 — key events (separado por vírgula; vazio = padrão)
+                    <input
+                      className="mt-0.5 w-full rounded border border-slate-300 px-2 py-1"
+                      placeholder="generate_lead, click_whatsapp, purchase"
+                      defaultValue={a.ga4_key_events ?? ""}
+                      onChange={(ev) =>
+                        setProfileEdit((s) => ({ ...s, [a.id]: { ...s[a.id], ga4_key_events: ev.target.value } }))
                       }
                     />
                   </label>
