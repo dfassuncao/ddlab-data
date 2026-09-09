@@ -25,14 +25,22 @@ const RELATORIOS = [
   { to: "/relatorios/opportunities", label: "Oportunidades" },
 ];
 
-function Section({ label, items }: { label: string; items: { to: string; label: string; end?: boolean }[] }) {
+function Section({
+  label,
+  items,
+  search,
+}: {
+  label: string;
+  items: { to: string; label: string; end?: boolean }[];
+  search: string;
+}) {
   return (
     <div className="mb-4">
       <div className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{label}</div>
       {items.map((n) => (
         <NavLink
           key={n.to}
-          to={n.to}
+          to={{ pathname: n.to, search }}
           end={n.end}
           className={({ isActive }) =>
             `block rounded-md px-3 py-1.5 text-sm ${
@@ -50,6 +58,7 @@ function Section({ label, items }: { label: string; items: { to: string; label: 
 export function Shell() {
   const { accounts, account, f } = usePage();
   const me = useQuery({ queryKey: ["me"], queryFn: api.me });
+  const search = `?account=${encodeURIComponent(f.account)}&from=${f.from}&to=${f.to}`;
 
   return (
     <div className="flex min-h-screen bg-slate-50">
@@ -80,9 +89,9 @@ export function Shell() {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-2 py-2">
-          <Section label="Núcleo" items={NUCLEO} />
-          <Section label="Relatórios" items={RELATORIOS} />
-          <Section label="" items={[{ to: "/configuracoes", label: "Configurações" }]} />
+          <Section label="Núcleo" items={NUCLEO} search={search} />
+          <Section label="Relatórios" items={RELATORIOS} search={search} />
+          <Section label="" items={[{ to: "/configuracoes", label: "Configurações" }]} search={search} />
         </nav>
 
         <div className="border-t border-slate-100 px-4 py-3 text-[11px] text-slate-400">
