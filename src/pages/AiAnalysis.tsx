@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -10,11 +10,24 @@ export function AiAnalysis() {
   const { accounts, account, f } = usePage();
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const latest = useQuery({
     queryKey: ["analysis", f.account],
     queryFn: () => api.analysisLatest(f.account),
     enabled: !!account,
+  });
+
+  const history = useQuery({
+    queryKey: ["analysis-history", f.account],
+    queryFn: () => api.analysisHistory(f.account),
+    enabled: !!account,
+  });
+
+  const selected = useQuery({
+    queryKey: ["analysis-record", f.account, selectedId],
+    queryFn: () => api.analysisById(f.account, selectedId!),
+    enabled: !!account && selectedId != null,
   });
 
   const generate = useMutation({
@@ -25,12 +38,18 @@ export function AiAnalysis() {
         setError(res.error);
         return;
       }
+      setSelectedId(null);
       qc.invalidateQueries({ queryKey: ["analysis", f.account] });
+      qc.invalidateQueries({ queryKey: ["analysis-history", f.account] });
     },
     onError: (e: any) => setError(e?.message ?? "Erro desconhecido"),
   });
 
-  const record = latest.data?.latest;
+  useEffect(() => setSelectedId(null), [f.account]);
+
+  const rows: { id: number; range_from: string; range_to: string; generated_at: string; generated_by?: string }[] =
+    history.data?.rows ?? [];
+  const record = selectedId != null ? selected.data?.record : latest.data?.latest;
 
   return (
     <div className="space-y-5">
@@ -57,6 +76,37 @@ export function AiAnalysis() {
         {account?.profile_notes && " O briefing do cliente (Configurações) é considerado, mas não aparece aqui."}
       </p>
 
+      {rows.length > 0 && (
+        <div className="rounded-lg border border-slate-200 bg-white">
+          <div className="border-b border-slate-100 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Histórico de análises
+          </div>
+          <ul className="max-h-48 divide-y divide-slate-100 overflow-y-auto">
+            {rows.map((r) => {
+              const isSelected = selectedId == null ? r.id === rows[0].id : r.id === selectedId;
+              return (
+                <li key={r.id}>
+                  <button
+                    onClick={() => setSelectedId(r.id)}
+                    className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-slate-50 ${
+                      isSelected ? "bg-brand/5 font-medium text-brand" : "text-slate-700"
+                    }`}
+                  >
+                    <span>
+                      {new Date(r.generated_at).toLocaleString("pt-BR")}
+                      <span className="ml-2 text-xs text-slate-400">
+                        período {r.range_from} a {r.range_to}
+                      </span>
+                    </span>
+                    {r.generated_by && <span className="text-xs text-slate-400">{r.generated_by}</span>}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
       <QueryState q={latest} />
       {(error || generate.isError) && (
         <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
@@ -70,7 +120,13 @@ export function AiAnalysis() {
         </p>
       )}
 
-      {!generate.isPending && record && (
+      {!generate.isPending && selectedId != null && selected.isLoading && (
+        <p className="rounded-lg border border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-400">
+          Carregando análise selecionada…
+        </p>
+      )}
+
+      {!generate.isPending && record && !(selectedId != null && selected.isLoading) && (
         <div className="rounded-lg border border-slate-200 bg-white px-6 py-5">
           <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
             <span>
@@ -85,7 +141,7 @@ export function AiAnalysis() {
         </div>
       )}
 
-      {!generate.isPending && !record && !latest.isLoading && (
+      {!generate.isPending && !record && !latest.isLoading && selectedId == null && (
         <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-400">
           Nenhuma análise gerada ainda para {account?.name}. Clique em "Gerar análise".
         </p>
