@@ -2,19 +2,25 @@ import type { Env } from "../env";
 import { runQuery } from "../bq";
 import { bulkInsert } from "../db";
 
-const DEFAULT_KEY_EVENTS = [
-  "generate_lead",
-  "purchase",
-  "contact",
-  "form_submit",
-  "submit_lead_form",
-  "click_whatsapp",
-  "whatsapp_click",
-  "phone_call",
-];
-
 const safeIdent = (s: string) => /^[a-zA-Z0-9_]+$/.test(s);
 const yyyymmdd = (d: Date) => d.toISOString().slice(0, 10).replace(/-/g, "");
+
+/** Expressão SQL para "isto conta como key event / lead". */
+function keyEventExpr(keyEvents: string[]): string {
+  const list = keyEvents.filter(safeIdent);
+  if (list.length) {
+    return `event_name IN (${list.map((e) => `'${e}'`).join(", ")})`;
+  }
+  // Sem lista configurada: heurística que cobre os padrões de nome mais comuns.
+  return `(
+    event_name IN ('generate_lead','purchase','contact','form_submit','submit_lead_form',
+                   'phone_call','begin_checkout','sign_up','subscribe','schedule')
+    OR event_name LIKE 'lead%'
+    OR event_name LIKE '%_lead%'
+    OR event_name LIKE '%whatsapp%'
+    OR event_name LIKE '%form%'
+  )`;
+}
 
 /**
  * Query agregada do BigQuery export do GA4: uma linha por (dia, canal).
@@ -23,7 +29,7 @@ const yyyymmdd = (d: Date) => d.toISOString().slice(0, 10).replace(/-/g, "");
  * (o ETL não quebra) — mesmo padrão das queries do Google Ads.
  */
 function ga4Sql(env: Env, dataset: string, keyEvents: string[], startYmd: string, endYmd: string): string {
-  const evList = keyEvents.filter(safeIdent).map((e) => `'${e}'`).join(", ") || "'__none__'";
+  const keyExpr = keyEventExpr(keyEvents);
   const from = `\`${env.GCP_PROJECT_ID}.${dataset}.events_*\``;
 
   return `
@@ -36,7 +42,7 @@ function ga4Sql(env: Env, dataset: string, keyEvents: string[], startYmd: string
              FROM UNNEST(event_params) WHERE key = 'session_engaged')) AS engaged,
         LOWER(MAX(COALESCE(collected_traffic_source.manual_source, traffic_source.source))) AS src,
         LOWER(MAX(COALESCE(collected_traffic_source.manual_medium, traffic_source.medium))) AS med,
-        COUNTIF(event_name IN (${evList})) AS key_events,
+        COUNTIF(${keyExpr}) AS key_events,
         SUM(CASE WHEN event_name = 'purchase'
                  THEN COALESCE(ecommerce.purchase_revenue,
                                (SELECT value.double_value FROM UNNEST(event_params) WHERE key = 'value'))
@@ -89,7 +95,6 @@ export async function runGa4(
     .split(/[,\n;]/)
     .map((s) => s.trim())
     .filter(Boolean);
-  const list = keyEvents.length ? keyEvents : DEFAULT_KEY_EVENTS;
 
   const start = new Date(Date.now() - lookbackDays * 86_400_000);
   const startYmd = yyyymmdd(start);
@@ -98,7 +103,7 @@ export async function runGa4(
 
   const raw = await runQuery<Record<string, unknown>>(
     env,
-    ga4Sql(env, dataset, list, startYmd, endYmd),
+    ga4Sql(env, dataset, keyEvents, startYmd, endYmd),
   );
 
   const num = (v: unknown) => {
