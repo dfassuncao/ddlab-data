@@ -97,18 +97,29 @@ async function dataHealth(env: Env, account: any) {
   else if (ga4Meta?.status === "error")
     alerts.push({ titulo: "Falha na carga do GA4", detalhe: String(ga4Meta?.error ?? "").slice(0, 140), severidade: "alto" });
 
-  // Divergência Ads x GA4 (conversões vs key events) no período recente
+  // Divergência Ads x GA4 — só sobre os dias em que AMBAS as fontes têm dados,
+  // e só se a sobreposição for de pelo menos 7 dias (evita falso positivo quando
+  // o GA4 acabou de ser conectado e só tem 1-2 dias).
   const range = resolveRange(undefined, undefined);
-  const ads = await adsTotals(env, account.id, range.from, range.to);
-  const ga4 = await ga4Totals(env, account.id, range.from, range.to);
+  const [cmp] = await q<any>(
+    env,
+    `WITH ads AS (SELECT day, SUM(conversions) c FROM fact_campaign_daily WHERE account_id=? AND day>=? AND day<=? GROUP BY day),
+          ga AS  (SELECT day, SUM(key_events) k  FROM fact_ga4_daily       WHERE account_id=? AND day>=? AND day<=? GROUP BY day)
+     SELECT COUNT(*) dias, SUM(ads.c) ads_conv, SUM(ga.k) ga_ke
+     FROM ads JOIN ga USING (day)`,
+    [account.id, range.from, range.to, account.id, range.from, range.to],
+  );
   let divergence: number | null = null;
-  if (ads.conversions > 0 && ga4.key_events > 0) {
-    divergence = round(Math.abs(ads.conversions - ga4.key_events) / ads.conversions, 2);
-    if (divergence > 0.25)
+  const overlapDays = Number(cmp?.dias ?? 0);
+  if (overlapDays >= 7 && Number(cmp?.ads_conv) > 0 && Number(cmp?.ga_ke) > 0) {
+    const a = Number(cmp.ads_conv);
+    const g = Number(cmp.ga_ke);
+    divergence = round(Math.abs(a - g) / a, 2);
+    if (divergence > 0.3)
       alerts.push({
         titulo: "Conversões Ads × key events GA4 divergentes",
-        detalhe: `Ads: ${round(ads.conversions, 1)} · GA4: ${ga4.key_events} (${Math.round(divergence * 100)}%)`,
-        severidade: "alto",
+        detalhe: `${overlapDays} dias · Ads: ${round(a, 1)} · GA4: ${round(g, 1)} (${Math.round(divergence * 100)}%)`,
+        severidade: "revisar",
       });
   }
 
@@ -122,7 +133,7 @@ async function dataHealth(env: Env, account: any) {
       else if (s.status === "off") score -= 8;
     }
   }
-  if (divergence != null && divergence > 0.25) score -= 12;
+  if (divergence != null && divergence > 0.3) score -= 8;
   score = Math.max(0, Math.min(100, score));
 
   return { score, sources, alerts, divergence, range };
