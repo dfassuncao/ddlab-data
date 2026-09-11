@@ -120,6 +120,14 @@ duplicar/disputar com o Workers Builds). Se precisar rodar migrations do D1 em C
 faça isso à parte com `wrangler d1 migrations apply ddlab-data --remote` — o
 Workers Builds só cuida do deploy do Worker, não do banco.
 
+> **Nunca rode `npx wrangler deploy` sozinho na máquina local.** Ele publica o
+> Worker mas NÃO reconstrói o frontend antes — sobe o `dist/client` que já
+> estiver no seu disco, que pode estar desatualizado (uma tela nova do app
+> simplesmente não aparece, mesmo com o backend certo). Use sempre
+> `npm run deploy` (que roda `npm run build && wrangler deploy`) se precisar
+> publicar manualmente; o normal é nem precisar disso, já que todo push em
+> `main` já dispara o Workers Builds, que faz isso certo sozinho.
+
 ---
 
 ## 6. Cron
