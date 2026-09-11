@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { usePage } from "../lib/usePage";
@@ -18,11 +18,22 @@ export function Diagnostico() {
   const { account, f } = usePage();
   const qc = useQueryClient();
   const [err, setErr] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const latest = useQuery({
     queryKey: ["diagnostico", f.account],
     queryFn: () => api.diagnosticoLatest(f.account),
     enabled: !!account,
+  });
+  const history = useQuery({
+    queryKey: ["diagnostico-history", f.account],
+    queryFn: () => api.diagnosticoHistory(f.account),
+    enabled: !!account,
+  });
+  const selected = useQuery({
+    queryKey: ["diagnostico-record", f.account, selectedId],
+    queryFn: () => api.diagnosticoById(f.account, selectedId!),
+    enabled: !!account && selectedId != null,
   });
   const health = useQuery({
     queryKey: ["data-health", f.account],
@@ -34,14 +45,24 @@ export function Diagnostico() {
     mutationFn: () => api.diagnosticoGenerate({ account: f.account, from: f.from, to: f.to }),
     onMutate: () => setErr(null),
     onSuccess: (r) => {
-      if (r?.error) setErr(r.error);
-      else qc.invalidateQueries({ queryKey: ["diagnostico", f.account] });
+      if (r?.error) {
+        setErr(r.error);
+        return;
+      }
+      setSelectedId(null);
+      qc.invalidateQueries({ queryKey: ["diagnostico", f.account] });
+      qc.invalidateQueries({ queryKey: ["diagnostico-history", f.account] });
     },
     onError: (e: any) => setErr(e?.message ?? "Erro"),
   });
 
-  const data = gen.data?.data ?? latest.data?.data ?? null;
-  const record = latest.data?.latest;
+  useEffect(() => setSelectedId(null), [f.account]);
+
+  const rows: { id: number; range_from: string; range_to: string; generated_at: string; generated_by?: string }[] =
+    history.data?.rows ?? [];
+  const isViewingSelected = selectedId != null;
+  const data = isViewingSelected ? selected.data?.data ?? null : gen.data?.data ?? latest.data?.data ?? null;
+  const record = isViewingSelected ? selected.data?.record : latest.data?.latest;
   const lowConfidence = (health.data?.score ?? 100) < 80;
 
   return (
@@ -61,6 +82,37 @@ export function Diagnostico() {
       />
       <QueryState q={latest} />
 
+      {rows.length > 0 && (
+        <div className="mb-4 rounded-lg border border-slate-200 bg-white">
+          <div className="border-b border-slate-100 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Histórico de diagnósticos
+          </div>
+          <ul className="max-h-48 divide-y divide-slate-100 overflow-y-auto">
+            {rows.map((r) => {
+              const isSelected = selectedId == null ? r.id === rows[0].id : r.id === selectedId;
+              return (
+                <li key={r.id}>
+                  <button
+                    onClick={() => setSelectedId(r.id)}
+                    className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-slate-50 ${
+                      isSelected ? "bg-brand/5 font-medium text-brand" : "text-slate-700"
+                    }`}
+                  >
+                    <span>
+                      {new Date(r.generated_at).toLocaleString("pt-BR")}
+                      <span className="ml-2 text-xs text-slate-400">
+                        período {r.range_from} a {r.range_to}
+                      </span>
+                    </span>
+                    {r.generated_by && <span className="text-xs text-slate-400">{r.generated_by}</span>}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
       {lowConfidence && (
         <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
           Confiança dos dados em {health.data?.score}%. Recomendações de automação ficam bloqueadas
@@ -76,7 +128,13 @@ export function Diagnostico() {
         </p>
       )}
 
-      {!gen.isPending && data && (
+      {!gen.isPending && isViewingSelected && selected.isLoading && (
+        <p className="rounded-lg border border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-400">
+          Carregando diagnóstico selecionado…
+        </p>
+      )}
+
+      {!gen.isPending && data && !(isViewingSelected && selected.isLoading) && (
         <div className="space-y-6">
           {record && (
             <p className="text-xs text-slate-400">
@@ -153,7 +211,7 @@ export function Diagnostico() {
         </div>
       )}
 
-      {!gen.isPending && !data && !latest.isLoading && (
+      {!gen.isPending && !data && !latest.isLoading && !isViewingSelected && (
         <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-400">
           Nenhum diagnóstico gerado ainda para {account?.name}. Clique em "Gerar diagnóstico".
         </p>

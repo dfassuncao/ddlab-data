@@ -41,6 +41,7 @@ export const api = {
   waste: (q: RangeQuery) => get<any>(`/waste${qs(q)}`),
   opportunities: (q: RangeQuery) => get<any>(`/opportunities${qs(q)}`),
   freshness: (account?: string) => get<any>(`/freshness${account ? `?account=${account}` : ""}`),
+  gsc: (kind: "queries" | "pages", q: RangeQuery) => get<any>(`/gsc/${kind}${qs(q)}`),
   refresh: (account?: string, days?: number) =>
     post<any>(`/refresh?${account ? `account=${account}&` : ""}${days ? `days=${days}` : ""}`),
   saveAccount: (body: Record<string, unknown>) => post<any>("/settings/account", body),
@@ -49,8 +50,14 @@ export const api = {
     post<any>("/annotations", body),
   analysisLatest: (account: string) => get<any>(`/analysis?account=${account}`),
   analysisGenerate: (q: RangeQuery) => post<any>(`/analysis${qs(q)}`),
+  analysisHistory: (account: string) => get<any>(`/analysis/history?account=${account}`),
+  analysisById: (account: string, id: number | string) =>
+    get<any>(`/analysis/${id}?account=${account}`),
   decisionCenter: (q: RangeQuery) => get<any>(`/decision-center${qs(q)}`),
   dataHealth: (account: string) => get<any>(`/data-health?account=${account}`),
   diagnosticoLatest: (account: string) => get<any>(`/diagnostico?account=${account}`),
   diagnosticoGenerate: (q: RangeQuery) => post<any>(`/diagnostico${qs(q)}`),
+  diagnosticoHistory: (account: string) => get<any>(`/diagnostico/history?account=${account}`),
+  diagnosticoById: (account: string, id: number | string) =>
+    get<any>(`/diagnostico/${id}?account=${account}`),
 };

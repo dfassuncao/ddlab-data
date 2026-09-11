@@ -6,8 +6,10 @@ import type { Env } from "./env";
  * A tela de login é 100% gerenciada pelo Access; aqui só validamos, como
  * defesa em profundidade, e extraímos o e-mail para auditoria.
  *
- * Se CF_ACCESS_TEAM_DOMAIN/AUD não estiverem configurados (ambiente local),
- * a verificação é ignorada e o usuário vira "dev@localhost".
+ * Se CF_ACCESS_TEAM_DOMAIN/AUD não estiverem configurados: em dev local
+ * (sem ENVIRONMENT=production) a verificação é ignorada e o usuário vira
+ * "dev@localhost"; em produção a API é bloqueada (500) em vez de liberar
+ * acesso sem login — ver ENVIRONMENT em wrangler.toml.
  */
 
 interface Jwk {
@@ -89,6 +91,15 @@ export function accessMiddleware() {
   return async (c: Context<{ Bindings: Env; Variables: { user: AccessUser } }>, next: Next) => {
     const { CF_ACCESS_TEAM_DOMAIN, CF_ACCESS_AUD } = c.env;
     if (!CF_ACCESS_TEAM_DOMAIN || !CF_ACCESS_AUD) {
+      // Fail-closed em produção: nunca servir a API sem Access configurado,
+      // mesmo que a requisição chegue por um host sem a Access Application
+      // na frente (ex.: o *.workers.dev, que não tem o Access na borda).
+      if (c.env.ENVIRONMENT === "production") {
+        return c.json(
+          { error: "Access não configurado (CF_ACCESS_TEAM_DOMAIN/CF_ACCESS_AUD ausentes) — bloqueado por segurança" },
+          500,
+        );
+      }
       c.set("user", { email: "dev@localhost" });
       return next();
     }

@@ -343,10 +343,44 @@ async function latestByKind(env: Env, accountId: string, kind: string) {
   return rows[0] ?? null;
 }
 
+/** Listagem enxuta (sem o conteúdo, que pode ser grande) das análises já geradas para a conta. */
+async function historyByKind(env: Env, accountId: string, kind: string) {
+  return q<any>(
+    env,
+    `SELECT id, range_from, range_to, model, generated_by, generated_at
+     FROM ai_analysis WHERE account_id = ? AND kind = ? ORDER BY generated_at DESC LIMIT 100`,
+    [accountId, kind],
+  );
+}
+
+async function byId(env: Env, accountId: string, kind: string, id: string) {
+  const rows = await q<any>(
+    env,
+    `SELECT * FROM ai_analysis WHERE id = ? AND account_id = ? AND kind = ?`,
+    [id, accountId, kind],
+  );
+  return rows[0] ?? null;
+}
+
 analysis.get("/analysis", async (c) => {
   const { account, error } = await accountOr404(c);
   if (error) return error;
   return c.json({ account, latest: await latestByKind(c.env, account!.id, "markdown") });
+});
+
+// Histórico de análises já geradas para a conta, mais recente primeiro.
+analysis.get("/analysis/history", async (c) => {
+  const { account, error } = await accountOr404(c);
+  if (error) return error;
+  return c.json({ account, rows: await historyByKind(c.env, account!.id, "markdown") });
+});
+
+analysis.get("/analysis/:id", async (c) => {
+  const { account, error } = await accountOr404(c);
+  if (error) return error;
+  const record = await byId(c.env, account!.id, "markdown", c.req.param("id"));
+  if (!record) return c.json({ error: "análise não encontrada" }, 404);
+  return c.json({ account, record });
 });
 
 analysis.get("/diagnostico", async (c) => {
@@ -362,6 +396,29 @@ analysis.get("/diagnostico", async (c) => {
     }
   }
   return c.json({ account, latest: row, data: parsed });
+});
+
+// Histórico de diagnósticos já gerados para a conta, mais recente primeiro.
+analysis.get("/diagnostico/history", async (c) => {
+  const { account, error } = await accountOr404(c);
+  if (error) return error;
+  return c.json({ account, rows: await historyByKind(c.env, account!.id, "diagnostico") });
+});
+
+analysis.get("/diagnostico/:id", async (c) => {
+  const { account, error } = await accountOr404(c);
+  if (error) return error;
+  const row = await byId(c.env, account!.id, "diagnostico", c.req.param("id"));
+  if (!row) return c.json({ error: "diagnóstico não encontrado" }, 404);
+  let parsed: unknown = null;
+  if (row.content) {
+    try {
+      parsed = JSON.parse(row.content);
+    } catch {
+      parsed = null;
+    }
+  }
+  return c.json({ account, record: row, data: parsed });
 });
 
 analysis.post("/diagnostico", async (c) => {

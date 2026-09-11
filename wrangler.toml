@@ -23,6 +23,10 @@ migrations_dir = "migrations"
 
 # Vars não-secretas (secrets vão por `wrangler secret put`)
 [vars]
+# Sinaliza produção: com isso setado, o Worker RECUSA servir /api/* (500) se
+# CF_ACCESS_TEAM_DOMAIN/CF_ACCESS_AUD estiverem vazios, em vez de liberar acesso
+# sem login (fail-closed). Em dev local (.dev.vars), deixe ausente.
+ENVIRONMENT = "production"
 GCP_PROJECT_ID = "studio-7861914720-de430"
 BQ_DATASET = "mcc_ddlab_google_ads"
 BQ_MCC_SUFFIX = "9123420378"
