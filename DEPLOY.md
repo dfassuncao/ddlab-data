@@ -95,16 +95,42 @@ Depois de criar, copie:
 - **Team domain**: `https://<seu-time>.cloudflareaccess.com` → só a parte `<seu-time>.cloudflareaccess.com`
 - **Application Audience (AUD) Tag**: string longa
 
-e configure no Worker:
+e configure no Worker como **secret** (nunca em `[vars]` — são credenciais que, mal
+configuradas, derrubam a proteção; ver caixa de segurança abaixo):
 
 ```bash
 npx wrangler secret put CF_ACCESS_TEAM_DOMAIN   # ex.: ddlab.cloudflareaccess.com
 npx wrangler secret put CF_ACCESS_AUD           # a AUD tag
 ```
 
-(ou coloque em `[vars]` do `wrangler.toml` e `npm run deploy` — não são segredos sensíveis).
+> **Se o `wrangler secret put` der erro "the latest version of your Worker isn't
+> currently deployed"**: rode `npx wrangler deploy` uma vez para publicar a versão
+> atual por completo e tente de novo — ou use o dashboard (próximo parágrafo).
+>
+> **Pelo dashboard**: Workers & Pages → **ddlab-data** → **Settings** → no menu à
+> esquerda **Runtime** (não **Builds** — essa aba tem uma seção "Variables and
+> Secrets" parecida, mas é para o *pipeline de build/CI*, o Worker em produção
+> nunca vê essas variáveis). Dentro de **Runtime → Variables and Secrets**,
+> adicionar as duas como tipo **Secret** e salvar.
+>
+> Depois de configurar (por CLI ou dashboard), **force um deploy novo** —
+> `npx wrangler versions deploy` ou um push trivial em `main` — antes de testar.
+> Uma versão do Worker publicada *antes* do secret existir pode não enxergá-lo.
 
-Teste: abrir a URL deve redirecionar para o login do Access. `curl` sem sessão deve dar 401/302.
+Teste: abrir a URL deve redirecionar para o login do Access. Recarregue a página
+logado e confira que o rodapé do menu mostra seu e‑mail real — se mostrar
+`dev@localhost`, o Access não está configurado de verdade (ver caixa de
+segurança abaixo).
+
+> ### ⚠️ Por que isso é crítico
+> `worker/auth.ts` só pula a verificação do JWT do Access quando
+> `CF_ACCESS_TEAM_DOMAIN`/`CF_ACCESS_AUD` estão vazios **e** a var `ENVIRONMENT`
+> (já setada como `"production"` em `wrangler.toml`) não é `"production"`. Ou
+> seja: em produção, se essas duas secrets sumirem ou nunca forem configuradas, a
+> API responde 500 em vez de abrir sem login — isso é intencional (fail‑closed),
+> não um bug. Se você ver a mensagem de erro *"Access não configurado ...
+> bloqueado por segurança"*, é exatamente essa checagem funcionando; a correção é
+> configurar as secrets certas, nunca remover/relaxar a checagem no código.
 
 ---
 
@@ -130,6 +156,39 @@ Workers Builds só cuida do deploy do Worker, não do banco.
 
 ---
 
+## 5.1. GA4 e Search Console (opcionais, por conta)
+
+Ambos usam o **bulk export nativo pro BigQuery** (não a API paga) — configurado
+direto na propriedade do GA4 / no Search Console, sem custo extra de quota.
+
+**GA4**: em Admin da propriedade → Integrações do BigQuery → Link, escolher o
+projeto `studio-7861914720-de430`. Cria um dataset `analytics_<id_da_propriedade>`.
+Leva algumas horas para os primeiros dados chegarem.
+
+**Search Console**: em Configurações da propriedade → Exportações em massa →
+Criar exportação, escolher o mesmo projeto GCP. Cria um dataset
+`searchconsole_<algum-nome>` (você escolhe o nome). **Leva até 48h** para os
+dados começarem a aparecer — e mesmo depois de "maduro", o GSC tem uma
+defasagem natural de ~2-3 dias entre a data real e a data disponível no export
+(normal, não é erro).
+
+Depois que o dataset aparecer no BigQuery (confira em **BigQuery Studio** do
+projeto — o dataset só terá uma tabela `temp_*` até os dados reais chegarem, aí
+viram `searchdata_site_impression`/`searchdata_url_impression` pro GSC, ou
+`events_*` pro GA4):
+
+1. Preencher o dataset em **Configurações** do app, no campo `ga4_dataset` ou
+   `Search Console — dataset` da conta correspondente
+2. Rodar o refresh (pelo DevTools, ver README) com `facts=ga4` ou `facts=gsc`
+3. Conferir em **Saúde dos dados** que a fonte aparece como "OK"
+
+Se uma conta trouxer schema diferente do esperado (nomes de coluna do GSC
+mudam raramente, mas acontece), o fato aparece com erro em **Saúde dos dados**
+e o ETL segue normalmente para as outras fontes/contas — ajuste em
+`worker/etl/ga4.ts`/`worker/etl/gsc.ts`.
+
+---
+
 ## 6. Cron
 
 O `wrangler.toml` já define `crons = ["0 9 * * *"]` (06:00 BRT). Confirme em
@@ -143,9 +202,12 @@ o histórico longo vem dos backfills manuais do passo 3.
 | Checagem | Como |
 |---|---|
 | Login | abrir a URL → tela do Access → entra |
+| Access de verdade configurado | logado, rodapé do menu mostra seu e‑mail real — **nunca** `dev@localhost` em produção |
 | API viva | `GET /api/health` → `{ok:true}` |
 | Contas | página carrega o seletor com as 5 contas |
-| Dados | após o `/api/refresh`, **Visão geral** mostra KPIs; **Configurações → Atualização** sem erros |
-| Colunas do BigQuery | algum fato com erro "Unrecognized name" → `GET /api/introspect?table=...` e ajustar `worker/etl/queries.ts` |
+| Dados (Ads) | após o `/api/refresh`, **Visão geral** mostra KPIs; **Saúde dos dados** sem erro em "Google Ads" |
+| Dados (GA4/GSC) | se configurados, **Saúde dos dados** mostra "OK" (não "Não conectado"/"Atrasado" além do esperado) |
+| Colunas do BigQuery | algum fato com erro "Unrecognized name" → `GET /api/introspect?table=...` e ajustar `worker/etl/*.ts` |
 | Custo BigQuery | Console GCP → BigQuery → *Query history* → bytes processados por execução |
-| CI | commit trivial → push → build dispara → nova versão |
+| CI | commit trivial → push → build dispara → nova versão (confira em Deployments) |
+| Frontend em dia | se uma tela nova não aparecer após um deploy manual, você provavelmente rodou `wrangler deploy` sem `npm run build` antes — ver aviso na seção 5 |

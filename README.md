@@ -1,16 +1,28 @@
 # DDLab · Ads Intelligence
 
-Aplicação de análise de campanhas de Google Ads da MCC da DDLab, começando pela **Doin Motors** e já multi‑conta.
+Aplicação de inteligência de marketing (Google Ads + GA4 + Search Console) da agência DDLab, multi‑conta.
 
-- **Fonte**: BigQuery (Google Ads Data Transfer) — projeto `studio-7861914720-de430`, dataset `mcc_ddlab_google_ads`.
-- **Pipeline**: um Cloudflare Worker roda 1x/dia (Cron) e pré‑agrega os dados no Cloudflare **D1**.
+- **Fontes** (todas via BigQuery, um dataset por conta/propriedade):
+  - **Google Ads** — Data Transfer nativo, projeto `studio-7861914720-de430`, dataset `mcc_ddlab_google_ads`.
+  - **GA4** (opcional por conta) — bulk export nativo do GA4, dataset `analytics_<id>`.
+  - **Search Console** (opcional por conta) — bulk export nativo do GSC, dataset `searchconsole_<conta>`.
+- **Pipeline**: um Cloudflare Worker roda 1x/dia (Cron) e pré‑agrega tudo no Cloudflare **D1**.
 - **App**: SPA React servida pelo mesmo Worker; leitura só do D1 (rápido e barato).
-- **Login**: Cloudflare Access (nada de senha no código).
+- **Login**: Cloudflare Access (nada de senha no código) — ver nota de segurança abaixo.
+- **Análise IA**: chamadas sob demanda à API da Anthropic, com histórico navegável das gerações passadas.
+
+> ⚠️ **Segurança**: em produção, se `CF_ACCESS_TEAM_DOMAIN`/`CF_ACCESS_AUD` não estiverem
+> configurados como *secrets* (não como var de build!) do Worker, a API recusa servir
+> `/api/*` (500) em vez de abrir acesso sem login — ver `worker/auth.ts` e o passo 4 do
+> [DEPLOY.md](./DEPLOY.md). Não desative essa checagem.
 
 ## Páginas
 
-Visão geral · Campanhas · Palavras‑chave · Termos de busca · Geografia · Horário & Dispositivo ·
-Anúncios · Públicos · Produtos · Landing pages · Desperdício · Oportunidades · Configurações
+**Núcleo**: Central de decisão · Diagnóstico IA · Saúde dos dados
+**Relatórios**: Visão geral · Análise IA (texto) · Campanhas · Palavras‑chave · Termos de busca ·
+Geografia · Horário & Dispositivo · Anúncios · Públicos · Produtos · Landing pages ·
+Search Console · Desperdício · Oportunidades
+**Configurações**: metas por conta, briefing do cliente, datasets de GA4/GSC, backfill manual
 
 ## Rodar local
 
@@ -39,11 +51,15 @@ Ver [DEPLOY.md](./DEPLOY.md).
 
 ```
 worker/           API (Hono) + ETL (BigQuery -> D1) + handler scheduled
-  etl/queries.ts  as queries do BigQuery, uma por "fato"
+  auth.ts         verificação do JWT do Cloudflare Access (fail-closed em produção)
+  etl/queries.ts  queries do Google Ads, uma por "fato"
+  etl/ga4.ts      query do bulk export do GA4 (nível canal)
+  etl/gsc.ts      queries do bulk export do Search Console (consultas + páginas)
   routes/         endpoints de relatório (leem o D1)
 src/              frontend React
 migrations/       schema e seed do D1
 shared/           tipos compartilhados
+docs/security-audit/  relatório de auditoria de segurança + script gerador
 ```
 
 ## Ajustar uma query do ETL
@@ -55,4 +71,17 @@ em **Configurações → Atualização de dados**. Descubra o nome real:
 curl "https://SEU-WORKER/api/introspect?table=p_ads_SearchQueryStats"
 ```
 
-e corrija em `worker/etl/queries.ts`.
+e corrija em `worker/etl/queries.ts` (Google Ads), `worker/etl/ga4.ts` (GA4) ou
+`worker/etl/gsc.ts` (Search Console).
+
+## Disparar o ETL manualmente
+
+`/api/refresh` fica atrás do Cloudflare Access — não dá para chamar com `curl` puro
+em produção (sem sessão, cai no login). Rode pelo DevTools do navegador já logado:
+
+```js
+fetch('/api/refresh?facts=gsc&days=90', { method: 'POST' }).then(r => r.json()).then(console.log)
+```
+
+`facts` aceita `campaign,keyword,search_term,geo,hour,device,ad,audience_age,audience_gender,product,landing_page,ga4,gsc`
+(vazio = todos). Omitir `account` roda para todas as contas ativas.
