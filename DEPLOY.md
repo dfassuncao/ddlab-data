@@ -105,17 +105,32 @@ npx wrangler secret put CF_ACCESS_AUD           # a AUD tag
 
 > **Se o `wrangler secret put` der erro "the latest version of your Worker isn't
 > currently deployed"**: rode `npx wrangler deploy` uma vez para publicar a versão
-> atual por completo e tente de novo — ou use o dashboard (próximo parágrafo).
+> atual por completo e tente de novo.
 >
-> **Pelo dashboard**: Workers & Pages → **ddlab-data** → **Settings** → no menu à
-> esquerda **Runtime** (não **Builds** — essa aba tem uma seção "Variables and
-> Secrets" parecida, mas é para o *pipeline de build/CI*, o Worker em produção
-> nunca vê essas variáveis). Dentro de **Runtime → Variables and Secrets**,
-> adicionar as duas como tipo **Secret** e salvar.
+> ### ⚠️ Isso NÃO sobrevive sozinho a um deploy pelo Workers Builds
+> Descobrimos (do jeito difícil, em produção) que um secret adicionado por
+> `wrangler secret put` ou pelo dashboard (Settings → Runtime → Variables and
+> Secrets) **some depois do próximo deploy automático** disparado por um push
+> em `main` — o Workers Builds roda cada build numa máquina limpa e o
+> `wrangler deploy` daquele pipeline não carrega esse estado. Resultado: a API
+> falha fechada (500, ver caixa abaixo) até alguém notar e reconfigurar
+> manualmente — e aí o próximo deploy derruba de novo.
 >
-> Depois de configurar (por CLI ou dashboard), **force um deploy novo** —
-> `npx wrangler versions deploy` ou um push trivial em `main` — antes de testar.
-> Uma versão do Worker publicada *antes* do secret existir pode não enxergá-lo.
+> A correção (já aplicada no repo) é **reaplicar os dois secrets a cada
+> deploy**, via `scripts/deploy.sh` (chamado por `npm run deploy`). Pra isso
+> funcionar também nos deploys automáticos do Workers Builds, configure UMA
+> VEZ:
+>
+> 1. Cloudflare → **Workers & Pages → ddlab-data → Settings → Builds**
+> 2. Em **Variables and Secrets** (a seção de build, não a de Runtime),
+>    adicionar `CF_ACCESS_TEAM_DOMAIN` e `CF_ACCESS_AUD` como **Secret** —
+>    essas ficam disponíveis como variável de ambiente durante o build/deploy
+> 3. Em **Build configuration**, trocar o **Deploy command** de
+>    `npx wrangler deploy` para `bash scripts/deploy.sh`
+>
+> A partir daí, todo deploy (manual ou automático) roda `wrangler deploy` e
+> em seguida reaplica os dois secrets lendo dessas variáveis — não depende
+> mais de ninguém lembrar de rodar `wrangler secret put` depois.
 
 Teste: abrir a URL deve redirecionar para o login do Access. Recarregue a página
 logado e confira que o rodapé do menu mostra seu e‑mail real — se mostrar
@@ -139,7 +154,9 @@ segurança abaixo).
 **Já configurado: Workers Builds.**
 Cloudflare → **Workers & Pages → ddlab-data → Settings → Build** está conectado ao repo
 `dfassuncao/ddlab-data`, branch `main`. Todo push em `main` dispara um build.
-Build command: `npm run build` · Deploy command: `npx wrangler deploy`.
+Build command: `npm run build` · **Deploy command: `bash scripts/deploy.sh`**
+(não `npx wrangler deploy` puro — ver a caixa de segurança do passo 4 sobre
+por que isso reaplica os secrets do Access a cada deploy).
 
 Não existe workflow de GitHub Actions para deploy (removido de propósito, para não
 duplicar/disputar com o Workers Builds). Se precisar rodar migrations do D1 em CI,
@@ -147,12 +164,11 @@ faça isso à parte com `wrangler d1 migrations apply ddlab-data --remote` — o
 Workers Builds só cuida do deploy do Worker, não do banco.
 
 > **Nunca rode `npx wrangler deploy` sozinho na máquina local.** Ele publica o
-> Worker mas NÃO reconstrói o frontend antes — sobe o `dist/client` que já
-> estiver no seu disco, que pode estar desatualizado (uma tela nova do app
-> simplesmente não aparece, mesmo com o backend certo). Use sempre
-> `npm run deploy` (que roda `npm run build && wrangler deploy`) se precisar
-> publicar manualmente; o normal é nem precisar disso, já que todo push em
-> `main` já dispara o Workers Builds, que faz isso certo sozinho.
+> Worker mas NÃO reconstrói o frontend antes (sobe o `dist/client` que já
+> estiver no seu disco, possivelmente desatualizado) e NÃO reaplica os secrets
+> do Access. Use sempre `npm run deploy` (que roda `npm run build && bash
+> scripts/deploy.sh`) se precisar publicar manualmente; o normal é nem
+> precisar disso, já que todo push em `main` dispara o Workers Builds sozinho.
 
 ---
 
