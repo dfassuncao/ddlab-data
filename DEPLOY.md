@@ -205,6 +205,48 @@ e o ETL segue normalmente para as outras fontes/contas — ajuste em
 
 ---
 
+## 5.2. Volume de busca / Keyword Planner (opcional, conta única para todas as contas)
+
+Diferente do GA4/GSC (que são por conta), essa integração é **uma credencial
+só, compartilhada pela MCC inteira** — é uma API de gestão do Google Ads
+(`googleads.googleapis.com`), não o BigQuery Transfer read-only.
+
+1. **Developer token**: Google Ads → Ferramentas e configurações → Acesso à
+   API → solicitar um token vinculado à MCC `9123420378`. Nível **Test** só
+   funciona com contas de teste — precisa de **Basic** (ou superior) aprovado
+   pelo Google para trazer dado real das 5 contas.
+2. **OAuth2 client**: Google Cloud Console (mesmo projeto `studio-7861914720-de430`
+   ou outro) → APIs e Serviços → Credenciais → criar **OAuth client ID** (tipo
+   Desktop ou Web) → anota o `client_id`/`client_secret`.
+3. **Refresh token**: gerar via [OAuth 2.0 Playground](https://developers.google.com/oauthplayground)
+   (ou fluxo próprio) autenticando com uma conta Google que tenha acesso à MCC,
+   escopo `https://www.googleapis.com/auth/adwords`. O resultado é um
+   `refresh_token` que não expira (até ser revogado).
+
+```bash
+npx wrangler secret put GOOGLE_ADS_DEVELOPER_TOKEN
+npx wrangler secret put GOOGLE_ADS_CLIENT_ID
+npx wrangler secret put GOOGLE_ADS_CLIENT_SECRET
+npx wrangler secret put GOOGLE_ADS_REFRESH_TOKEN
+npx wrangler secret put GOOGLE_ADS_LOGIN_CUSTOMER_ID   # 9123420378 (a MCC)
+```
+
+> Lembre da lição do passo 4: configure isso também como **Build secret** em
+> Settings → Builds → Variables and Secrets (não só via `wrangler secret put`
+> local), senão o próximo deploy automático some com essas credenciais igual
+> aconteceu com o Access.
+
+Sem essas 5 vars configuradas, o app funciona normalmente — só a coluna
+"Volume de busca" em **Search Console → Cruzamento com Ads** fica vazia.
+
+Uso: `POST /api/refresh?facts=keyword_volume` (pelo DevTools, como os outros
+refreshes) — busca os ~200 termos de maior custo de cada conta no período e
+consulta o volume médio mensal via `generateKeywordHistoricalMetrics`.
+**Não entra no cron diário** de propósito (consome quota da API e o volume
+muda pouco mês a mês) — rode manualmente de vez em quando.
+
+---
+
 ## 6. Cron
 
 O `wrangler.toml` já define `crons = ["0 9 * * *"]` (06:00 BRT). Confirme em

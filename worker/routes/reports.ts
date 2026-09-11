@@ -453,7 +453,7 @@ reports.get("/cruzamento", async (c) => {
   const { account, error } = await accountOr404(c);
   if (error) return error;
   const { from, to } = resolveRange(c.req.query("from"), c.req.query("to"));
-  const binds = [account!.id, from, to, account!.id, from, to];
+  const binds = [account!.id, from, to, account!.id, from, to, account!.id];
 
   const rows = await q(
     c.env,
@@ -471,10 +471,12 @@ reports.get("/cruzamento", async (c) => {
      terms AS (SELECT term FROM ads UNION SELECT term FROM gsc)
      SELECT t.term,
        a.impressions AS ads_impressions, a.clicks AS ads_clicks, a.cost AS ads_cost, a.conversions AS ads_conversions,
-       g.impressions AS gsc_impressions, g.clicks AS gsc_clicks, g.position AS gsc_position
+       g.impressions AS gsc_impressions, g.clicks AS gsc_clicks, g.position AS gsc_position,
+       v.avg_monthly_searches AS volume_busca
      FROM terms t
      LEFT JOIN ads a ON a.term = t.term
      LEFT JOIN gsc g ON g.term = t.term
+     LEFT JOIN fact_keyword_volume v ON v.account_id = ? AND v.keyword = t.term
      ORDER BY (COALESCE(a.clicks,0) + COALESCE(g.clicks,0)) DESC
      LIMIT 500`,
     binds,
@@ -491,7 +493,7 @@ reports.get("/cruzamento", async (c) => {
     gsc_clicks: r.gsc_clicks ?? 0,
     gsc_ctr: r.gsc_impressions > 0 ? round((r.gsc_clicks / r.gsc_impressions) * 100, 2) : null,
     gsc_position: r.gsc_position ?? null,
-    volume_busca: null, // Keyword Planner não integrado (API separada do Ads) — placeholder
+    volume_busca: r.volume_busca ?? null, // preenchido depois de rodar /api/refresh?facts=keyword_volume
   }));
   return c.json({ account, range: { from, to }, rows: data });
 });

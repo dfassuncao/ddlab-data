@@ -65,7 +65,15 @@ const CRUZAMENTO_COLUMNS = (currency: string): Column<CruzamentoRow>[] => [
     key: "volume_busca",
     header: "Volume de busca",
     align: "right",
-    render: () => <span title="Requer integração com o Keyword Planner (API do Google Ads), ainda não conectada.">—</span>,
+    render: (r) =>
+      r.volume_busca == null ? (
+        <span title="Ainda sem dado do Keyword Planner para este termo — rode o refresh de volume em Configurações.">
+          —
+        </span>
+      ) : (
+        int(r.volume_busca)
+      ),
+    sortValue: (r) => r.volume_busca ?? -1,
   },
 ];
 
@@ -125,8 +133,8 @@ export function SearchConsole() {
           {tab === "cruzamento" && (
             <p className="text-xs text-slate-400">
               Cruza o termo literal de busca do Google Ads com as consultas orgânicas do Search Console.
-              A coluna "Volume de busca" depende do Keyword Planner (API separada do Ads), ainda não
-              conectado — por isso fica vazia.
+              A coluna "Volume de busca" vem do Keyword Planner e só é atualizada sob demanda — rode
+              o refresh (<code>facts=keyword_volume</code>) para preencher/atualizar os termos desta conta.
             </p>
           )}
 

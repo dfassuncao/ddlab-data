@@ -26,3 +26,14 @@ REFRESH_TOKEN=
 # com billing próprio — é uma chamada de API paga, separada da assinatura do Claude Code.
 ANTHROPIC_API_KEY=
 ANTHROPIC_MODEL=claude-sonnet-5
+
+# Volume de busca (Keyword Planner). API SEPARADA do BigQuery Transfer — exige
+# OAuth2 de usuário (não service account) + developer token aprovado pelo
+# Google, vinculado à MCC 9123420378. Sem isso, a coluna "Volume de busca" em
+# Search Console → Cruzamento fica vazia (a feature funciona normalmente sem
+# essas vars, só sem esse dado). Ver DEPLOY.md para onde obter cada valor.
+GOOGLE_ADS_DEVELOPER_TOKEN=
+GOOGLE_ADS_CLIENT_ID=
+GOOGLE_ADS_CLIENT_SECRET=
+GOOGLE_ADS_REFRESH_TOKEN=
+GOOGLE_ADS_LOGIN_CUSTOMER_ID=9123420378

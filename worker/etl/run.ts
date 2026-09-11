@@ -4,6 +4,7 @@ import { listAccounts, bulkInsert, bulkUpdate, chunk } from "../db";
 import { FACTS, type FactSpec } from "./queries";
 import { runGa4 } from "./ga4";
 import { runGsc } from "./gsc";
+import { runKeywordVolume } from "./keywordVolume";
 
 const NUM_COLS: Record<string, string[]> = {
   fact_campaign_daily: [
@@ -178,6 +179,20 @@ export async function runEtl(env: Env, opts: EtlOptions = {}) {
         const msg = e instanceof Error ? e.message : String(e);
         await writeMeta(account.id, "gsc", "error", 0, "", msg.slice(0, 500));
         results.push({ account: account.id, fact: "gsc", status: "error", rows: 0, error: msg });
+      }
+    }
+
+    // Volume de busca (Keyword Planner) — NUNCA roda no cron (opts.facts vazio),
+    // só quando pedido explicitamente: custa quota da API do Google Ads.
+    if (opts.facts?.includes("keyword_volume")) {
+      try {
+        const { status, rows } = await runKeywordVolume(env, account, opts.lookbackDays ?? 90);
+        await writeMeta(account.id, "keyword_volume", status, rows, "", null);
+        results.push({ account: account.id, fact: "keyword_volume", status, rows });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        await writeMeta(account.id, "keyword_volume", "error", 0, "", msg.slice(0, 500));
+        results.push({ account: account.id, fact: "keyword_volume", status: "error", rows: 0, error: msg });
       }
     }
   }

@@ -16,4 +16,13 @@ export interface Env {
   GCP_SA_KEY: string;
   REFRESH_TOKEN?: string;
   ANTHROPIC_API_KEY?: string;
+
+  // Google Ads API (Keyword Planner — volume de busca). OAuth2 de usuário,
+  // não service account; requer developer token aprovado pelo Google.
+  GOOGLE_ADS_DEVELOPER_TOKEN?: string;
+  GOOGLE_ADS_CLIENT_ID?: string;
+  GOOGLE_ADS_CLIENT_SECRET?: string;
+  GOOGLE_ADS_REFRESH_TOKEN?: string;
+  /** Customer ID (sem traços) da MCC usada no header login-customer-id. Default: BQ_MCC_SUFFIX. */
+  GOOGLE_ADS_LOGIN_CUSTOMER_ID?: string;
 }
