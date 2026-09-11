@@ -9,6 +9,8 @@ export interface Env {
   CF_ACCESS_TEAM_DOMAIN: string;
   CF_ACCESS_AUD: string;
   ANTHROPIC_MODEL: string;
+  /** "production" em produção (wrangler.toml). Ausente em dev local (.dev.vars não define). */
+  ENVIRONMENT?: string;
 
   // secrets
   GCP_SA_KEY: string;
