@@ -7,7 +7,13 @@ const PRESETS = [
   { label: "90d", days: 90 },
 ];
 
+const iso = (d: Date) => d.toISOString().slice(0, 10);
+const YESTERDAY = iso(new Date(Date.now() - 86_400_000));
+
 export function FilterBar({ accounts, f }: { accounts: Account[]; f: Filters }) {
+  const isActivePreset = (days: number) =>
+    f.to === YESTERDAY && f.from === iso(new Date(Date.now() - days * 86_400_000));
+
   return (
     <div className="flex flex-wrap items-center gap-3">
       <select
@@ -27,7 +33,11 @@ export function FilterBar({ accounts, f }: { accounts: Account[]; f: Filters }) 
           <button
             key={p.days}
             onClick={() => f.preset(p.days)}
-            className="rounded px-2.5 py-1 text-sm text-slate-600 hover:bg-slate-100"
+            className={`rounded px-2.5 py-1 text-sm font-medium ${
+              isActivePreset(p.days)
+                ? "bg-brand text-white shadow-sm"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
           >
             {p.label}
           </button>
