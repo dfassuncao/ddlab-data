@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import { usePage } from "../lib/usePage";
 import { PageTop } from "../components/PageTop";
 import { QueryState } from "../components/PageHeader";
+import { downloadCsv } from "../lib/csv";
 
 const CAT: Record<string, { label: string; bar: string; chip: string }> = {
   critico: { label: "Crítico", bar: "border-l-rose-500", chip: "text-rose-600" },
@@ -194,18 +195,54 @@ export function Diagnostico() {
 
           <div>
             <h2 className="mb-2 text-sm font-semibold text-slate-700">Checklist de ações</h2>
-            <ul className="space-y-1.5 rounded-lg border border-slate-200 bg-white p-4 text-sm">
+            <ul className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 text-sm">
               {(data.findings ?? [])
                 .slice()
                 .sort((a: any, b: any) => (b.confianca ?? 0) - (a.confianca ?? 0))
-                .map((fd: any, i: number) => (
-                  <li key={i} className="flex gap-2">
-                    <input type="checkbox" className="mt-1" />
-                    <span>
-                      {fd.acao} <span className="text-slate-400">— {fd.impacto}</span>
-                    </span>
-                  </li>
-                ))}
+                .map((fd: any, i: number) => {
+                  const termos: string[] = fd.termos_negativos ?? [];
+                  const estrutura: { grupo: string; itens?: string[] }[] = fd.estrutura_sugerida ?? [];
+                  return (
+                    <li key={i} className="flex gap-2">
+                      <input type="checkbox" className="mt-1" />
+                      <div className="flex-1">
+                        <span>
+                          {fd.acao} <span className="text-slate-400">— {fd.impacto}</span>
+                        </span>
+
+                        {termos.length > 0 && (
+                          <div className="mt-1">
+                            <button
+                              onClick={() =>
+                                downloadCsv(
+                                  `negativas-diagnostico-${i + 1}.csv`,
+                                  ["Keyword", "Match Type", "Level"],
+                                  termos.map((t) => [t, "Phrase", "Campaign"]),
+                                )
+                              }
+                              className="text-xs font-medium text-brand hover:underline"
+                            >
+                              ↓ Baixar lista de negativas ({termos.length} termo{termos.length > 1 ? "s" : ""})
+                            </button>
+                          </div>
+                        )}
+
+                        {estrutura.length > 0 && (
+                          <div className="mt-1.5 space-y-1 rounded-md bg-slate-50 p-2">
+                            {estrutura.map((g, gi) => (
+                              <div key={gi} className="text-xs">
+                                <span className="font-medium text-slate-700">{g.grupo}</span>
+                                {(g.itens ?? []).length > 0 && (
+                                  <span className="text-slate-500"> — {g.itens!.join(", ")}</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
             </ul>
           </div>
         </div>

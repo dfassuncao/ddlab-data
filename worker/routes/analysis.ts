@@ -324,7 +324,9 @@ Responda APENAS com um objeto JSON válido (sem markdown, sem cercas de código)
       "titulo": "frase curta",
       "evidencia": "1-2 frases com os números que sustentam",
       "impacto": "efeito estimado, com número quando possível (ex.: '-18 leads/mês', 'Economia R$ 1.180')",
-      "acao": "o que fazer, específico e executável"
+      "acao": "o que fazer, específico e executável",
+      "termos_negativos": ["termo 1", "termo 2"],
+      "estrutura_sugerida": [ { "grupo": "nome da campanha/grupo de anúncio sugerido", "itens": ["o que entra nesse grupo"] } ]
     }
   ],
   "causal": [
@@ -332,7 +334,11 @@ Responda APENAS com um objeto JSON válido (sem markdown, sem cercas de código)
   ]
 }
 
-Regras: 4 a 8 findings, ordenados por severidade (critico/desperdicio primeiro) e impacto. Não invente números fora do JSON. Se GA4 não estiver configurado ("ga4_por_canal.configurado": false), diga isso num finding de categoria "mensuracao" e não fabrique métricas de sessão. "causal" pode ter 0 a 4 itens — só inclua relações realmente sustentadas pelos dados.`;
+Regras: 4 a 8 findings, ordenados por severidade (critico/desperdicio primeiro) e impacto. Não invente números fora do JSON. Se GA4 não estiver configurado ("ga4_por_canal.configurado": false), diga isso num finding de categoria "mensuracao" e não fabrique métricas de sessão. "causal" pode ter 0 a 4 itens — só inclua relações realmente sustentadas pelos dados.
+
+"termos_negativos" e "estrutura_sugerida" são OPCIONAIS por finding — omita o campo (ou mande array vazio) quando não se aplicar:
+- Preencha "termos_negativos" com a lista exata de termos/palavras-chave citados em "acao" sempre que a ação for negativar/excluir termos de busca ou palavras-chave — cada termo deve aparecer sozinho, sem aspas nem pontuação extra, pronto para virar uma negativa de verdade no Google Ads.
+- Preencha "estrutura_sugerida" sempre que a ação for separar, reorganizar ou criar campanhas/grupos de anúncios novos — um item por campanha/grupo sugerido, com os elementos (palavras-chave, públicos, produtos) que deveriam ficar juntos naquele grupo.`;
 
 async function latestByKind(env: Env, accountId: string, kind: string) {
   const rows = await q<any>(
