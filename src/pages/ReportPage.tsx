@@ -5,6 +5,7 @@ import { PageHeader, QueryState } from "../components/PageHeader";
 import { DataTable, type Column } from "../components/DataTable";
 import { metricCols, qualityCol } from "../lib/columns";
 import { brl, int, pct } from "../lib/format";
+import { downloadCsv } from "../lib/csv";
 
 type Row = Record<string, any>;
 
@@ -50,21 +51,10 @@ const LP_COLS: Column<Row>[] = [
 ];
 
 function downloadNegativesCsv(rows: Row[]) {
-  const header = "Campaign,Keyword,Match Type,Level";
   const body = rows
     .filter((r) => (r.conversions ?? 0) === 0 && (r.cost ?? 0) > 0)
-    .map((r) => {
-      const term = String(r.label ?? "").replace(/"/g, '""');
-      const camp = String(r.campaign ?? "").replace(/"/g, '""');
-      return `"${camp}","${term}",Phrase,Campaign`;
-    });
-  const csv = [header, ...body].join("\r\n");
-  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `negativas-${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+    .map((r) => [r.campaign ?? "", r.label ?? "", "Phrase", "Campaign"]);
+  downloadCsv(`negativas-${new Date().toISOString().slice(0, 10)}.csv`, ["Campaign", "Keyword", "Match Type", "Level"], body);
 }
 
 export function ReportPage({
