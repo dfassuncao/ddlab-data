@@ -3,6 +3,7 @@ import { runQuery } from "../bq";
 import { listAccounts, bulkInsert, bulkUpdate, chunk } from "../db";
 import { FACTS, type FactSpec } from "./queries";
 import { runGa4 } from "./ga4";
+import { runGsc } from "./gsc";
 
 const NUM_COLS: Record<string, string[]> = {
   fact_campaign_daily: [
@@ -165,11 +166,25 @@ export async function runEtl(env: Env, opts: EtlOptions = {}) {
         results.push({ account: account.id, fact: "ga4", status: "error", rows: 0, error: msg });
       }
     }
+
+    // Search Console (queries + páginas) — só se a conta tem gsc_dataset configurado.
+    if (!opts.facts?.length || opts.facts.includes("gsc")) {
+      const lookback = opts.lookbackDays ?? 400;
+      try {
+        const { status, rows, from } = await runGsc(env, account, lookback);
+        await writeMeta(account.id, "gsc", status, rows, from, null);
+        results.push({ account: account.id, fact: "gsc", status, rows });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        await writeMeta(account.id, "gsc", "error", 0, "", msg.slice(0, 500));
+        results.push({ account: account.id, fact: "gsc", status: "error", rows: 0, error: msg });
+      }
+    }
   }
 
   // Retenção: mantém 400 dias em cada fato.
   const cutoff = startDate(400);
-  for (const table of [...Object.keys(NUM_COLS), "fact_ga4_daily"]) {
+  for (const table of [...Object.keys(NUM_COLS), "fact_ga4_daily", "fact_gsc_query_daily", "fact_gsc_page_daily"]) {
     await env.DB.prepare(`DELETE FROM ${table} WHERE day < ?`).bind(cutoff).run();
   }
 

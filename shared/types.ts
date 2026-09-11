@@ -20,6 +20,8 @@ export interface Account {
   ga4_dataset: string | null;
   /** Key events do GA4 a contar como conversão (separado por vírgula) */
   ga4_key_events: string | null;
+  /** Dataset do bulk export do Search Console (ex.: searchconsole_doin), no mesmo projeto GCP */
+  gsc_dataset: string | null;
 }
 
 export interface Totals {

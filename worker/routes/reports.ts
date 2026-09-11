@@ -416,6 +416,36 @@ reports.get("/opportunities", async (c) => {
   });
 });
 
+reports.get("/gsc/:kind", async (c) => {
+  const kind = c.req.param("kind");
+  const col = kind === "queries" ? "query" : kind === "pages" ? "page" : null;
+  if (!col) return c.json({ error: "kind deve ser 'queries' ou 'pages'" }, 404);
+  const table = kind === "queries" ? "fact_gsc_query_daily" : "fact_gsc_page_daily";
+  const { account, error } = await accountOr404(c);
+  if (error) return error;
+  const { from, to } = resolveRange(c.req.query("from"), c.req.query("to"));
+
+  const rows = await q(
+    c.env,
+    `SELECT ${col} AS label, SUM(clicks) AS clicks, SUM(impressions) AS impressions,
+       ROUND(AVG(position), 1) AS position
+     FROM ${table}
+     WHERE account_id = ? AND day >= ? AND day <= ?
+     GROUP BY ${col}
+     ORDER BY clicks DESC
+     LIMIT 500`,
+    [account!.id, from, to],
+  );
+  const data = rows.map((r: any) => ({
+    label: r.label ?? (kind === "queries" ? "(consulta anônima)" : "(sem rótulo)"),
+    clicks: r.clicks,
+    impressions: r.impressions,
+    ctr: r.impressions > 0 ? round((r.clicks / r.impressions) * 100, 2) : 0,
+    position: r.position,
+  }));
+  return c.json({ account, range: { from, to }, rows: data });
+});
+
 reports.get("/freshness", async (c) => {
   const acc = c.req.query("account");
   const rows = acc
@@ -459,6 +489,7 @@ reports.post("/settings/account", async (c) => {
     lead_goal_monthly?: number | null;
     ga4_dataset?: string | null;
     ga4_key_events?: string | null;
+    gsc_dataset?: string | null;
   }>();
   if (!body.id) return c.json({ error: "id obrigatório" }, 400);
   await c.env.DB.prepare(
@@ -471,7 +502,8 @@ reports.post("/settings/account", async (c) => {
        ideal_ticket_min = COALESCE(?, ideal_ticket_min),
        lead_goal_monthly = COALESCE(?, lead_goal_monthly),
        ga4_dataset = COALESCE(?, ga4_dataset),
-       ga4_key_events = COALESCE(?, ga4_key_events)
+       ga4_key_events = COALESCE(?, ga4_key_events),
+       gsc_dataset = COALESCE(?, gsc_dataset)
      WHERE id = ?`,
   )
     .bind(
@@ -484,6 +516,7 @@ reports.post("/settings/account", async (c) => {
       body.lead_goal_monthly ?? null,
       body.ga4_dataset ?? null,
       body.ga4_key_events ?? null,
+      body.gsc_dataset ?? null,
       body.id,
     )
     .run();

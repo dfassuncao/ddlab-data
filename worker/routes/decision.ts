@@ -59,6 +59,7 @@ async function dataHealth(env: Env, account: any) {
 
   const adsTo = byFact.campaign?.data_to ?? null;
   const ga4Meta = byFact.ga4;
+  const gscMeta = byFact.gsc;
 
   const sources = [
     {
@@ -83,7 +84,22 @@ async function dataHealth(env: Env, account: any) {
               ? "atrasado"
               : "ok",
     },
-    { key: "gsc", label: "Search Console", connected: false, last_day: null, status: "off" },
+    {
+      key: "gsc",
+      label: "Search Console",
+      connected: !!(account.gsc_dataset && gscMeta && gscMeta.status !== "skip"),
+      last_day: gscMeta?.status === "ok" ? gscMeta?.data_to ?? null : null,
+      status: !account.gsc_dataset
+        ? "off"
+        : gscMeta?.status === "error"
+          ? "erro"
+          : gscMeta?.status === "skip"
+            ? "off"
+            // GSC tem defasagem natural de ~2-3 dias mesmo saudável.
+            : daysBetween(gscMeta?.data_to) > 4
+              ? "atrasado"
+              : "ok",
+    },
     { key: "crm", label: "CRM", connected: false, last_day: null, status: "off" },
   ];
 
@@ -96,6 +112,10 @@ async function dataHealth(env: Env, account: any) {
     alerts.push({ titulo: "GA4 não conectado", detalhe: "Preencha o dataset do export do GA4 em Configurações", severidade: "revisar" });
   else if (ga4Meta?.status === "error")
     alerts.push({ titulo: "Falha na carga do GA4", detalhe: String(ga4Meta?.error ?? "").slice(0, 140), severidade: "alto" });
+  if (!account.gsc_dataset)
+    alerts.push({ titulo: "Search Console não conectado", detalhe: "Preencha o dataset do export do GSC em Configurações", severidade: "revisar" });
+  else if (gscMeta?.status === "error")
+    alerts.push({ titulo: "Falha na carga do Search Console", detalhe: String(gscMeta?.error ?? "").slice(0, 140), severidade: "alto" });
 
   // Divergência Ads x GA4 — só sobre os dias em que AMBAS as fontes têm dados,
   // e só se a sobreposição for de pelo menos 7 dias (evita falso positivo quando
@@ -131,6 +151,11 @@ async function dataHealth(env: Env, account: any) {
       if (s.status === "erro") score -= 25;
       else if (s.status === "atrasado") score -= 10;
       else if (s.status === "off") score -= 8;
+    }
+    if (s.key === "gsc") {
+      if (s.status === "erro") score -= 15;
+      else if (s.status === "atrasado") score -= 5;
+      else if (s.status === "off") score -= 4;
     }
   }
   if (divergence != null && divergence > 0.3) score -= 8;

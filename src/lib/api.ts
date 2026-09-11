@@ -41,6 +41,7 @@ export const api = {
   waste: (q: RangeQuery) => get<any>(`/waste${qs(q)}`),
   opportunities: (q: RangeQuery) => get<any>(`/opportunities${qs(q)}`),
   freshness: (account?: string) => get<any>(`/freshness${account ? `?account=${account}` : ""}`),
+  gsc: (kind: "queries" | "pages", q: RangeQuery) => get<any>(`/gsc/${kind}${qs(q)}`),
   refresh: (account?: string, days?: number) =>
     post<any>(`/refresh?${account ? `account=${account}&` : ""}${days ? `days=${days}` : ""}`),
   saveAccount: (body: Record<string, unknown>) => post<any>("/settings/account", body),

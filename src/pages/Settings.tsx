@@ -31,6 +31,7 @@ export function Settings() {
         lead_goal_monthly?: string;
         ga4_dataset?: string;
         ga4_key_events?: string;
+        gsc_dataset?: string;
       }
     >
   >({});
@@ -139,6 +140,7 @@ export function Settings() {
                         ga4_dataset: pe.ga4_dataset !== undefined ? pe.ga4_dataset.trim() : undefined,
                         ga4_key_events:
                           pe.ga4_key_events !== undefined ? pe.ga4_key_events.trim() : undefined,
+                        gsc_dataset: pe.gsc_dataset !== undefined ? pe.gsc_dataset.trim() : undefined,
                       })
                     }
                   >
@@ -202,6 +204,17 @@ export function Settings() {
                       defaultValue={a.ga4_key_events ?? ""}
                       onChange={(ev) =>
                         setProfileEdit((s) => ({ ...s, [a.id]: { ...s[a.id], ga4_key_events: ev.target.value } }))
+                      }
+                    />
+                  </label>
+                  <label className="block">
+                    Search Console — dataset do bulk export do BigQuery (mesmo projeto GCP)
+                    <input
+                      className="mt-0.5 w-full rounded border border-slate-300 px-2 py-1"
+                      placeholder="searchconsole_doin"
+                      defaultValue={a.gsc_dataset ?? ""}
+                      onChange={(ev) =>
+                        setProfileEdit((s) => ({ ...s, [a.id]: { ...s[a.id], gsc_dataset: ev.target.value } }))
                       }
                     />
                   </label>
