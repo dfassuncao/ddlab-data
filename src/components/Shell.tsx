@@ -21,6 +21,7 @@ const RELATORIOS = [
   { to: "/relatorios/audiences", label: "Públicos" },
   { to: "/relatorios/products", label: "Produtos" },
   { to: "/relatorios/landing-pages", label: "Landing pages" },
+  { to: "/relatorios/search-console", label: "Search Console" },
   { to: "/relatorios/waste", label: "Desperdício" },
   { to: "/relatorios/opportunities", label: "Oportunidades" },
 ];
