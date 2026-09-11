@@ -50,6 +50,7 @@ const CRUZAMENTO_COLUMNS = (currency: string): Column<CruzamentoRow>[] => [
   { key: "ads_clicks", header: "Cliques (Ads)", align: "right", render: (r) => int(r.ads_clicks) },
   { key: "ads_ctr", header: "CTR (Ads)", align: "right", render: (r) => (r.ads_ctr == null ? "—" : pct(r.ads_ctr)) },
   { key: "ads_cost", header: "Custo (Ads)", align: "right", render: (r) => brl(r.ads_cost, currency) },
+  { key: "ads_conversions", header: "Conversões (Ads)", align: "right", render: (r) => dec(r.ads_conversions, 1) },
   { key: "gsc_impressions", header: "Impr. (GSC)", align: "right", render: (r) => int(r.gsc_impressions) },
   { key: "gsc_clicks", header: "Cliques (GSC)", align: "right", render: (r) => int(r.gsc_clicks) },
   { key: "gsc_ctr", header: "CTR (GSC)", align: "right", render: (r) => (r.gsc_ctr == null ? "—" : pct(r.gsc_ctr)) },
