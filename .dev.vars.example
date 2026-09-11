@@ -8,11 +8,18 @@ BQ_DATASET=mcc_ddlab_google_ads
 BQ_MCC_SUFFIX=9123420378
 
 # Cloudflare Access (preencher depois de criar a Access Application).
-# Em dev pode deixar vazio para pular a verificação de JWT.
+# Em dev pode deixar vazio para pular a verificação de JWT — SÓ funciona assim
+# porque ENVIRONMENT não é "production" aqui. Em produção (wrangler.toml define
+# ENVIRONMENT=production), essas duas ausentes fazem a API recusar servir
+# /api/* (500) em vez de abrir sem login. Configure via `wrangler secret put`
+# ou dashboard → Settings → Runtime (não Builds) — ver DEPLOY.md passo 4.
 CF_ACCESS_TEAM_DOMAIN=
 CF_ACCESS_AUD=
 
-# Token simples para proteger POST /api/refresh quando chamado fora do Access (ex.: cron externo). Opcional.
+# REFRESH_TOKEN: existe no código (worker/env.ts) mas NÃO é validado em nenhum
+# lugar hoje — não depende dele para proteger /api/refresh (isso fica só atrás
+# do Cloudflare Access). Deixe vazio; ver achado F3 da auditoria de segurança
+# em docs/security-audit/ se for implementar de fato.
 REFRESH_TOKEN=
 
 # Análise IA (página "Análise IA"). Chave da conta Anthropic (console.anthropic.com/settings/keys),
