@@ -446,6 +446,56 @@ reports.get("/gsc/:kind", async (c) => {
   return c.json({ account, range: { from, to }, rows: data });
 });
 
+// Cruza termos de busca do Ads (o que o usuário literalmente digitou, não a
+// palavra-chave configurada) com as consultas orgânicas do Search Console —
+// mesma dimensão (texto da busca) nas duas fontes.
+reports.get("/cruzamento", async (c) => {
+  const { account, error } = await accountOr404(c);
+  if (error) return error;
+  const { from, to } = resolveRange(c.req.query("from"), c.req.query("to"));
+  const binds = [account!.id, from, to, account!.id, from, to];
+
+  const rows = await q(
+    c.env,
+    `WITH ads AS (
+       SELECT LOWER(TRIM(search_term)) AS term,
+         SUM(impressions) AS impressions, SUM(clicks) AS clicks,
+         SUM(cost) AS cost, SUM(conversions) AS conversions
+       FROM fact_searchterm_daily WHERE account_id=? AND day>=? AND day<=? GROUP BY term
+     ),
+     gsc AS (
+       SELECT LOWER(TRIM(query)) AS term,
+         SUM(impressions) AS impressions, SUM(clicks) AS clicks, ROUND(AVG(position), 1) AS position
+       FROM fact_gsc_query_daily WHERE account_id=? AND day>=? AND day<=? GROUP BY term
+     ),
+     terms AS (SELECT term FROM ads UNION SELECT term FROM gsc)
+     SELECT t.term,
+       a.impressions AS ads_impressions, a.clicks AS ads_clicks, a.cost AS ads_cost, a.conversions AS ads_conversions,
+       g.impressions AS gsc_impressions, g.clicks AS gsc_clicks, g.position AS gsc_position
+     FROM terms t
+     LEFT JOIN ads a ON a.term = t.term
+     LEFT JOIN gsc g ON g.term = t.term
+     ORDER BY (COALESCE(a.clicks,0) + COALESCE(g.clicks,0)) DESC
+     LIMIT 500`,
+    binds,
+  );
+
+  const data = rows.map((r: any) => ({
+    label: r.term ?? "(consulta anônima)",
+    ads_impressions: r.ads_impressions ?? 0,
+    ads_clicks: r.ads_clicks ?? 0,
+    ads_ctr: r.ads_impressions > 0 ? round((r.ads_clicks / r.ads_impressions) * 100, 2) : null,
+    ads_cost: r.ads_cost ?? 0,
+    ads_conversions: r.ads_conversions ?? 0,
+    gsc_impressions: r.gsc_impressions ?? 0,
+    gsc_clicks: r.gsc_clicks ?? 0,
+    gsc_ctr: r.gsc_impressions > 0 ? round((r.gsc_clicks / r.gsc_impressions) * 100, 2) : null,
+    gsc_position: r.gsc_position ?? null,
+    volume_busca: null, // Keyword Planner não integrado (API separada do Ads) — placeholder
+  }));
+  return c.json({ account, range: { from, to }, rows: data });
+});
+
 reports.get("/freshness", async (c) => {
   const acc = c.req.query("account");
   const rows = acc
