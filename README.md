@@ -85,3 +85,8 @@ fetch('/api/refresh?facts=gsc&days=90', { method: 'POST' }).then(r => r.json()).
 
 `facts` aceita `campaign,keyword,search_term,geo,hour,device,ad,audience_age,audience_gender,product,landing_page,ga4,gsc`
 (vazio = todos). Omitir `account` roda para todas as contas ativas.
+
+`keyword_volume` (volume de busca do Keyword Planner) é a exceção: **nunca**
+roda com `facts` vazio/todos — só quando pedido explicitamente
+(`?facts=keyword_volume`), porque consome quota da API do Google Ads e muda
+pouco mês a mês. Requer as 5 vars `GOOGLE_ADS_*` configuradas (ver DEPLOY.md).
