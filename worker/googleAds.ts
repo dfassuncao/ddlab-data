@@ -36,7 +36,7 @@ export interface KeywordVolume {
   competition_index: number | null;
 }
 
-const API_VERSION = "v17";
+const API_VERSION = "v25";
 // Brasil / Português — ajuste se alguma conta tiver mercado diferente.
 const GEO_TARGET_BRASIL = "geoTargetConstants/2076";
 const LANGUAGE_PT = "languageConstants/1014";
