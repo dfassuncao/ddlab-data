@@ -30,9 +30,14 @@ ENVIRONMENT = "production"
 GCP_PROJECT_ID = "studio-7861914720-de430"
 BQ_DATASET = "mcc_ddlab_google_ads"
 BQ_MCC_SUFFIX = "9123420378"
-# Preencher depois de criar a Access Application:
-CF_ACCESS_TEAM_DOMAIN = ""
-CF_ACCESS_AUD = ""
+# CF_ACCESS_TEAM_DOMAIN e CF_ACCESS_AUD NÃO ficam aqui — são secrets (wrangler
+# secret put / dashboard → Runtime → Variables and Secrets). Isso já causou
+# bugs sérios: `wrangler deploy` reaplica todo o conteúdo de [vars] a cada
+# deploy, então tê-las aqui (mesmo vazias) sobrescrevia o secret configurado
+# manualmente TODA VEZ que o Workers Builds rodava — e ainda colidia com
+# scripts/deploy.sh tentando recriá-las como secret ("Binding name ... already
+# in use", erro 10053), derrubando o próprio deploy. Nunca redeclare essas
+# duas aqui.
 # Modelo usado na Análise IA (chave via `wrangler secret put ANTHROPIC_API_KEY`)
 ANTHROPIC_MODEL = "claude-sonnet-5"
 
