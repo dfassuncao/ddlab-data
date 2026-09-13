@@ -107,30 +107,35 @@ npx wrangler secret put CF_ACCESS_AUD           # a AUD tag
 > currently deployed"**: rode `npx wrangler deploy` uma vez para publicar a versão
 > atual por completo e tente de novo.
 >
-> ### ⚠️ Isso NÃO sobrevive sozinho a um deploy pelo Workers Builds
-> Descobrimos (do jeito difícil, em produção) que um secret adicionado por
-> `wrangler secret put` ou pelo dashboard (Settings → Runtime → Variables and
-> Secrets) **some depois do próximo deploy automático** disparado por um push
-> em `main` — o Workers Builds roda cada build numa máquina limpa e o
-> `wrangler deploy` daquele pipeline não carrega esse estado. Resultado: a API
-> falha fechada (500, ver caixa abaixo) até alguém notar e reconfigurar
-> manualmente — e aí o próximo deploy derruba de novo.
+> ### ⚠️ Causa raiz real de um bug sério que já aconteceu (histórico, resolvido)
+> Por um bom tempo, `CF_ACCESS_TEAM_DOMAIN`/`CF_ACCESS_AUD` somiam depois de
+> praticamente todo deploy automático. A causa **não** era o Workers Builds
+> "esquecer" secrets — era o próprio `wrangler.toml` do repositório ter
+> `CF_ACCESS_TEAM_DOMAIN = ""` e `CF_ACCESS_AUD = ""` dentro de `[vars]` (um
+> resquício do início do projeto, antes do Access existir). `wrangler deploy`
+> reaplica **todo** o conteúdo de `[vars]` a cada deploy — então essas duas
+> linhas recriavam a var vazia toda vez, sobrescrevendo qualquer secret
+> configurado manualmente. Pior: como var e secret não podem ter o mesmo nome,
+> isso chegou a quebrar o próprio deploy com
+> `Binding name 'CF_ACCESS_TEAM_DOMAIN' already in use [code: 10053]` quando
+> algo tentava recriar como secret logo depois.
 >
-> A correção (já aplicada no repo) é **reaplicar os dois secrets a cada
-> deploy**, via `scripts/deploy.sh` (chamado por `npm run deploy`). Pra isso
-> funcionar também nos deploys automáticos do Workers Builds, configure UMA
-> VEZ:
+> **A correção real foi remover essas duas linhas do `[vars]` do
+> `wrangler.toml`** — elas nunca deveriam estar lá. Nunca as adicione de volta,
+> nem vazias "só de placeholder".
+>
+> Como camada extra de segurança, `scripts/deploy.sh` (chamado por
+> `npm run deploy`) também reaplica os dois secrets a cada deploy, lendo de
+> variável de ambiente — útil caso algum dia percam o valor por outro motivo.
+> Pra isso funcionar nos deploys automáticos do Workers Builds também,
+> configure uma vez:
 >
 > 1. Cloudflare → **Workers & Pages → ddlab-data → Settings → Builds**
 > 2. Em **Variables and Secrets** (a seção de build, não a de Runtime),
 >    adicionar `CF_ACCESS_TEAM_DOMAIN` e `CF_ACCESS_AUD` como **Secret** —
 >    essas ficam disponíveis como variável de ambiente durante o build/deploy
-> 3. Em **Build configuration**, trocar o **Deploy command** de
->    `npx wrangler deploy` para `bash scripts/deploy.sh`
->
-> A partir daí, todo deploy (manual ou automático) roda `wrangler deploy` e
-> em seguida reaplica os dois secrets lendo dessas variáveis — não depende
-> mais de ninguém lembrar de rodar `wrangler secret put` depois.
+> 3. Em **Build configuration**, o **Deploy command** deve ser
+>    `bash scripts/deploy.sh` (não `npx wrangler deploy` puro)
 
 Teste: abrir a URL deve redirecionar para o login do Access. Recarregue a página
 logado e confira que o rodapé do menu mostra seu e‑mail real — se mostrar
