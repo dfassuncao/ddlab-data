@@ -7,6 +7,7 @@ import { Overview } from "./pages/Overview";
 import { AiAnalysis } from "./pages/AiAnalysis";
 import { ReportPage } from "./pages/ReportPage";
 import { SearchConsole } from "./pages/SearchConsole";
+import { TermClassification } from "./pages/TermClassification";
 import { Schedule } from "./pages/Schedule";
 import { Waste } from "./pages/Waste";
 import { Opportunities } from "./pages/Opportunities";
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="/relatorios/products" element={<ReportPage kind="products" title="Produtos (Shopping/PMax)" />} />
         <Route path="/relatorios/landing-pages" element={<ReportPage kind="landing-pages" title="Landing pages" />} />
         <Route path="/relatorios/search-console" element={<SearchConsole />} />
+        <Route path="/relatorios/classificacao-termos" element={<TermClassification />} />
         <Route path="/relatorios/waste" element={<Waste />} />
         <Route path="/relatorios/opportunities" element={<Opportunities />} />
 

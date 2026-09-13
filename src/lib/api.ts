@@ -43,6 +43,7 @@ export const api = {
   freshness: (account?: string) => get<any>(`/freshness${account ? `?account=${account}` : ""}`),
   gsc: (kind: "queries" | "pages", q: RangeQuery) => get<any>(`/gsc/${kind}${qs(q)}`),
   cruzamento: (q: RangeQuery) => get<any>(`/cruzamento${qs(q)}`),
+  termClassification: (q: RangeQuery) => get<any>(`/term-classification${qs(q)}`),
   refresh: (account?: string, days?: number) =>
     post<any>(`/refresh?${account ? `account=${account}&` : ""}${days ? `days=${days}` : ""}`),
   saveAccount: (body: Record<string, unknown>) => post<any>("/settings/account", body),
