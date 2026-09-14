@@ -9,8 +9,9 @@ import { bulkInsert, chunk } from "../db";
  * ?facts=term_classification em /api/refresh, como o keyword_volume.
  */
 
-const TERMS_PER_BATCH = 25;
+const TERMS_PER_BATCH = 15;
 const MAX_TERMS = 200;
+const MAX_TOKENS = 16000;
 
 const CLASSIFICACOES_PRINCIPAIS = [
   "Marca própria",
@@ -139,7 +140,7 @@ export async function runTermClassification(
       termos: batch.map((t) => ({ termo: t.term, origem_dados: origemByTerm.get(t.term) })),
     });
 
-    const { text } = await callClaude(env, SYSTEM_PROMPT, userContent, 4000);
+    const { text } = await callClaude(env, SYSTEM_PROMPT, userContent, MAX_TOKENS);
     const parsed = extractJsonArray(text);
 
     for (const item of parsed) {
