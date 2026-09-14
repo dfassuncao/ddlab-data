@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
@@ -57,52 +58,95 @@ function Section({
   );
 }
 
+const COLLAPSE_KEY = "ddlab.sidebar.collapsed";
+
 export function Shell() {
   const { accounts, account, f } = usePage();
   const me = useQuery({ queryKey: ["me"], queryFn: api.me });
   const search = `?account=${encodeURIComponent(f.account)}&from=${f.from}&to=${f.to}`;
 
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(COLLAPSE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+
+  const toggle = () => {
+    setCollapsed((c) => {
+      const next = !c;
+      try {
+        localStorage.setItem(COLLAPSE_KEY, next ? "1" : "0");
+      } catch {
+        // localStorage indisponível (modo privado etc.) — ok ignorar
+      }
+      return next;
+    });
+  };
+
   return (
     <div className="flex min-h-screen bg-slate-50">
-      <aside className="fixed inset-y-0 left-0 flex w-56 flex-col border-r border-slate-200 bg-white">
+      <aside
+        className={`fixed inset-y-0 left-0 flex flex-col border-r border-slate-200 bg-white transition-[width] duration-150 ${
+          collapsed ? "w-14" : "w-56"
+        }`}
+      >
         <div className="flex items-center gap-2 px-4 py-4">
-          <span className="grid h-7 w-7 place-items-center rounded bg-brand text-sm text-white">◧</span>
-          <div className="leading-tight">
-            <div className="text-sm font-semibold text-slate-900">DDLab</div>
-            <div className="text-[10px] uppercase tracking-wider text-slate-400">Intelligence</div>
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded bg-brand text-sm text-white">◧</span>
+          {!collapsed && (
+            <div className="min-w-0 leading-tight">
+              <div className="truncate text-sm font-semibold text-slate-900">DDLab</div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-400">Intelligence</div>
+            </div>
+          )}
+        </div>
+
+        {!collapsed && (
+          <div className="px-3 pb-3">
+            <label className="mb-1 block px-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              Workspace
+            </label>
+            <select
+              className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm font-medium"
+              value={f.account}
+              onChange={(e) => f.setAccount(e.target.value)}
+            >
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
           </div>
-        </div>
+        )}
 
-        <div className="px-3 pb-3">
-          <label className="mb-1 block px-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-            Workspace
-          </label>
-          <select
-            className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm font-medium"
-            value={f.account}
-            onChange={(e) => f.setAccount(e.target.value)}
-          >
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {!collapsed && (
+          <nav className="flex-1 overflow-y-auto px-2 py-2">
+            <Section label="Núcleo" items={NUCLEO} search={search} />
+            <Section label="Relatórios" items={RELATORIOS} search={search} />
+            <Section label="" items={[{ to: "/configuracoes", label: "Configurações" }]} search={search} />
+          </nav>
+        )}
+        {collapsed && <div className="flex-1" />}
 
-        <nav className="flex-1 overflow-y-auto px-2 py-2">
-          <Section label="Núcleo" items={NUCLEO} search={search} />
-          <Section label="Relatórios" items={RELATORIOS} search={search} />
-          <Section label="" items={[{ to: "/configuracoes", label: "Configurações" }]} search={search} />
-        </nav>
+        <button
+          onClick={toggle}
+          title={collapsed ? "Expandir menu" : "Recolher menu"}
+          className="mx-2 mb-2 rounded-md border border-slate-200 py-1.5 text-xs text-slate-500 hover:bg-slate-100"
+        >
+          {collapsed ? "»" : "« Recolher"}
+        </button>
 
-        <div className="border-t border-slate-100 px-4 py-3 text-[11px] text-slate-400">
-          {me.data?.email}
-          {account && <div className="mt-0.5 truncate">{account.name}</div>}
-        </div>
+        {!collapsed && (
+          <div className="border-t border-slate-100 px-4 py-3 text-[11px] text-slate-400">
+            {me.data?.email}
+            {account && <div className="mt-0.5 truncate">{account.name}</div>}
+          </div>
+        )}
       </aside>
 
-      <main className="ml-56 flex-1 px-8 py-6">
+      <main className={`flex-1 px-8 py-6 transition-[margin] duration-150 ${collapsed ? "ml-14" : "ml-56"}`}>
         <div className="mx-auto max-w-[1400px]">
           <Outlet />
         </div>

@@ -49,6 +49,18 @@ async function ga4Totals(env: Env, id: string, from: string, to: string) {
   };
 }
 
+async function classificationDistribution(env: Env, id: string) {
+  return q<{ classificacao_principal: string; count: number }>(
+    env,
+    `SELECT classificacao_principal, COUNT(*) AS count
+     FROM fact_term_classification
+     WHERE account_id = ? AND classificacao_principal IS NOT NULL
+     GROUP BY classificacao_principal
+     ORDER BY count DESC`,
+    [id],
+  );
+}
+
 /** Saúde dos dados: por fonte + alertas + score. */
 async function dataHealth(env: Env, account: any) {
   const fresh = await q(env, `SELECT fact, status, data_to, last_run_at, error FROM meta_refresh WHERE account_id=?`, [account.id]);
@@ -177,13 +189,14 @@ decision.get("/decision-center", async (c) => {
   const { from, to } = resolveRange(c.req.query("from"), c.req.query("to"));
   const prev = previousRange(from, to);
 
-  const [adsCur, adsPrev, ga4Cur, ga4Prev, queue, health] = await Promise.all([
+  const [adsCur, adsPrev, ga4Cur, ga4Prev, queue, health, classificacaoDistribuicao] = await Promise.all([
     adsTotals(c.env, account.id, from, to),
     adsTotals(c.env, account.id, prev.from, prev.to),
     ga4Totals(c.env, account.id, from, to),
     ga4Totals(c.env, account.id, prev.from, prev.to),
     buildQueue(c.env, account, from, to),
     dataHealth(c.env, account),
+    classificationDistribution(c.env, account.id),
   ]);
 
   const trendRows = await q(
@@ -220,6 +233,7 @@ decision.get("/decision-center", async (c) => {
     score_parts: { eficiencia: round(eff, 2), tendencia: round(trend, 2), engajamento: round(eng, 2), saude_dados: round(healthN, 2) },
     queue,
     data_health: { score: health.score, sources: health.sources, alerts: health.alerts },
+    classificacao_distribuicao: classificacaoDistribuicao,
     pulse: {
       investimento: adsCur.cost,
       investimento_prev: adsPrev.cost,

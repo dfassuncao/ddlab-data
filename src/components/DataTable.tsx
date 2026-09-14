@@ -18,11 +18,14 @@ export function DataTable<T extends Record<string, any>>({
   columns,
   initialSort,
   rowKey,
+  stickyFirstColumn,
 }: {
   rows: T[];
   columns: Column<T>[];
   initialSort?: { key: string; dir: "asc" | "desc" };
   rowKey: (row: T) => string;
+  /** Fixa a primeira coluna ao rolar horizontalmente (útil em tabelas com muitas colunas). */
+  stickyFirstColumn?: boolean;
 }) {
   const [sort, setSort] = useState(initialSort ?? { key: columns[0].key, dir: "desc" as const });
   const [page, setPage] = useState(0);
@@ -44,13 +47,14 @@ export function DataTable<T extends Record<string, any>>({
   const clampedPage = Math.min(page, pageCount - 1);
   const paged = sorted.slice(clampedPage * PAGE_SIZE, clampedPage * PAGE_SIZE + PAGE_SIZE);
   const hasTotals = columns.some((c) => c.total);
+  const stickyCls = (i: number) => (stickyFirstColumn && i === 0 ? "sticky left-0 z-10" : "");
 
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
       <table className="min-w-full text-sm">
         <thead>
           <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-            {columns.map((c) => (
+            {columns.map((c, i) => (
               <th
                 key={c.key}
                 onClick={() =>
@@ -59,9 +63,9 @@ export function DataTable<T extends Record<string, any>>({
                     dir: s.key === c.key && s.dir === "desc" ? "asc" : "desc",
                   }))
                 }
-                className={`cursor-pointer select-none px-3 py-2 font-medium hover:text-slate-700 ${
+                className={`cursor-pointer select-none whitespace-nowrap px-3 py-2 font-medium hover:text-slate-700 ${
                   c.align === "right" ? "text-right" : ""
-                }`}
+                } ${stickyCls(i)} ${stickyCls(i) && "bg-slate-50"}`}
               >
                 {c.header}
                 {sort.key === c.key ? (sort.dir === "desc" ? " ↓" : " ↑") : ""}
@@ -71,11 +75,13 @@ export function DataTable<T extends Record<string, any>>({
         </thead>
         <tbody>
           {paged.map((row) => (
-            <tr key={rowKey(row)} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-              {columns.map((c) => (
+            <tr key={rowKey(row)} className="group border-b border-slate-100 last:border-0 hover:bg-slate-50">
+              {columns.map((c, i) => (
                 <td
                   key={c.key}
-                  className={`px-3 py-2 ${c.align === "right" ? "num text-right" : ""} ${c.className ?? ""}`}
+                  className={`px-3 py-2 ${c.align === "right" ? "num text-right" : ""} ${c.className ?? ""} ${stickyCls(i)} ${
+                    stickyCls(i) && "bg-white group-hover:bg-slate-50"
+                  }`}
                 >
                   {c.render ? c.render(row) : String(row[c.key] ?? "—")}
                 </td>
@@ -94,7 +100,10 @@ export function DataTable<T extends Record<string, any>>({
           <tfoot>
             <tr className="border-t-2 border-slate-200 bg-slate-50 font-medium">
               {columns.map((c, i) => (
-                <td key={c.key} className={`px-3 py-2 ${c.align === "right" ? "num text-right" : ""}`}>
+                <td
+                  key={c.key}
+                  className={`px-3 py-2 ${c.align === "right" ? "num text-right" : ""} ${stickyCls(i)} ${stickyCls(i) && "bg-slate-50"}`}
+                >
                   {c.total ? c.total(sorted) : i === 0 ? "Total" : ""}
                 </td>
               ))}

@@ -4,6 +4,9 @@ import {
   ComposedChart,
   Bar,
   Line,
+  Pie,
+  PieChart,
+  Cell,
   XAxis,
   YAxis,
   Tooltip,
@@ -24,6 +27,19 @@ const SEV: Record<string, { label: string; cls: string }> = {
   revisar: { label: "Revisar", cls: "bg-slate-100 text-slate-600" },
 };
 
+const PIE_COLORS = [
+  "#2563eb",
+  "#059669",
+  "#d97706",
+  "#dc2626",
+  "#7c3aed",
+  "#0891b2",
+  "#65a30d",
+  "#db2777",
+  "#475569",
+  "#ea580c",
+];
+
 function greeting() {
   const h = new Date().getHours();
   return h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite";
@@ -39,6 +55,7 @@ export function DecisionCenter() {
   const d = q.data;
   const cur = account?.currency ?? "BRL";
   const queue: any[] = d?.queue ?? [];
+  const classificacao: { classificacao_principal: string; count: number }[] = d?.classificacao_distribuicao ?? [];
 
   return (
     <div>
@@ -132,6 +149,54 @@ export function DecisionCenter() {
               ))}
             </div>
           </div>
+
+          {/* Classificação de termos */}
+          {classificacao.length > 0 && (
+            <div>
+              <h2 className="mb-2 text-sm font-semibold text-slate-700">
+                Distribuição da classificação principal (termos de busca)
+              </h2>
+              <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 md:grid-cols-2">
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={classificacao}
+                        dataKey="count"
+                        nameKey="classificacao_principal"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={90}
+                        isAnimationActive={false}
+                      >
+                        {classificacao.map((_, i) => (
+                          <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(v: number) => int(v)} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex flex-col justify-center gap-1.5 text-xs">
+                  {classificacao.map((c, i) => (
+                    <div key={c.classificacao_principal} className="flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-1.5 text-slate-600">
+                        <span
+                          className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                          style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}
+                        />
+                        {c.classificacao_principal}
+                      </span>
+                      <span className="num font-medium text-slate-900">{int(c.count)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <p className="mt-1 text-xs text-slate-400">
+                Baseado nos termos já classificados em Classificação de termos — atualiza sob demanda.
+              </p>
+            </div>
+          )}
 
           {/* Chart */}
           <div>
