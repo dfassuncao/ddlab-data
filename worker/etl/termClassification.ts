@@ -130,66 +130,76 @@ export async function runTermClassification(
   if (terms.length === 0) return { status: "ok", rows: 0 };
 
   const now = new Date().toISOString();
-  const rows: ClassificationRow[] = [];
+  const columns = [
+    "account_id",
+    "term",
+    "classificacao_principal",
+    "etiquetas",
+    "intencao_busca",
+    "etapa_funil",
+    "temperatura",
+    "relevancia",
+    "adequacao_publico",
+    "localidade",
+    "relacionamento_marca",
+    "potencial_conversao",
+    "origem_dados",
+    "cobertura_atual",
+    "acao_recomendada",
+    "updated_at",
+  ];
 
-  for (const batch of chunk(terms, TERMS_PER_BATCH)) {
-    const origemByTerm = new Map(batch.map((t) => [t.term, origemDados(t)]));
-    const userContent = JSON.stringify({
-      conta: account.name,
-      briefing_do_cliente: account.profile_notes || null,
-      termos: batch.map((t) => ({ termo: t.term, origem_dados: origemByTerm.get(t.term) })),
-    });
-
-    const { text } = await callClaude(env, SYSTEM_PROMPT, userContent, MAX_TOKENS);
-    const parsed = extractJsonArray(text);
-
-    for (const item of parsed) {
-      const term = String(item.termo ?? "").toLowerCase().trim();
-      if (!term || !origemByTerm.has(term)) continue;
-      rows.push({
-        account_id: account.id,
-        term,
-        classificacao_principal: item.classificacao_principal ?? null,
-        etiquetas: Array.isArray(item.etiquetas) ? item.etiquetas.join(", ") : null,
-        intencao_busca: item.intencao_busca ?? null,
-        etapa_funil: item.etapa_funil ?? null,
-        temperatura: item.temperatura ?? null,
-        relevancia: item.relevancia ?? null,
-        adequacao_publico: item.adequacao_publico ?? null,
-        localidade: item.localidade ?? null,
-        relacionamento_marca: item.relacionamento_marca ?? null,
-        potencial_conversao: item.potencial_conversao ?? null,
-        origem_dados: origemByTerm.get(term)!,
-        cobertura_atual: item.cobertura_atual ?? null,
-        acao_recomendada: item.acao_recomendada ?? null,
-        updated_at: now,
+  // Lotes disparados em paralelo (não um atrás do outro): com ~200 termos /
+  // 15 por lote isso passa de 14 chamadas sequenciais (minutos, estourando o
+  // orçamento de tempo do waitUntil do Worker) para o tempo de uma única
+  // chamada. Cada lote grava direto no D1 assim que termina, então mesmo que
+  // algum lote falhe os demais não se perdem.
+  const results = await Promise.allSettled(
+    chunk(terms, TERMS_PER_BATCH).map(async (batch) => {
+      const origemByTerm = new Map(batch.map((t) => [t.term, origemDados(t)]));
+      const userContent = JSON.stringify({
+        conta: account.name,
+        briefing_do_cliente: account.profile_notes || null,
+        termos: batch.map((t) => ({ termo: t.term, origem_dados: origemByTerm.get(t.term) })),
       });
-    }
-  }
 
-  await bulkInsert(
-    env,
-    "fact_term_classification",
-    [
-      "account_id",
-      "term",
-      "classificacao_principal",
-      "etiquetas",
-      "intencao_busca",
-      "etapa_funil",
-      "temperatura",
-      "relevancia",
-      "adequacao_publico",
-      "localidade",
-      "relacionamento_marca",
-      "potencial_conversao",
-      "origem_dados",
-      "cobertura_atual",
-      "acao_recomendada",
-      "updated_at",
-    ],
-    rows,
+      const { text } = await callClaude(env, SYSTEM_PROMPT, userContent, MAX_TOKENS);
+      const parsed = extractJsonArray(text);
+
+      const rows: ClassificationRow[] = [];
+      for (const item of parsed) {
+        const term = String(item.termo ?? "").toLowerCase().trim();
+        if (!term || !origemByTerm.has(term)) continue;
+        rows.push({
+          account_id: account.id,
+          term,
+          classificacao_principal: item.classificacao_principal ?? null,
+          etiquetas: Array.isArray(item.etiquetas) ? item.etiquetas.join(", ") : null,
+          intencao_busca: item.intencao_busca ?? null,
+          etapa_funil: item.etapa_funil ?? null,
+          temperatura: item.temperatura ?? null,
+          relevancia: item.relevancia ?? null,
+          adequacao_publico: item.adequacao_publico ?? null,
+          localidade: item.localidade ?? null,
+          relacionamento_marca: item.relacionamento_marca ?? null,
+          potencial_conversao: item.potencial_conversao ?? null,
+          origem_dados: origemByTerm.get(term)!,
+          cobertura_atual: item.cobertura_atual ?? null,
+          acao_recomendada: item.acao_recomendada ?? null,
+          updated_at: now,
+        });
+      }
+
+      await bulkInsert(env, "fact_term_classification", columns, rows);
+      return rows.length;
+    }),
   );
 
-  return { status: "ok", rows: rows.length };
+  const totalRows = results.reduce((sum, r) => sum + (r.status === "fulfilled" ? r.value : 0), 0);
+  const failed = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
+  if (failed.length > 0 && totalRows === 0) {
+    throw new Error(failed[0].reason instanceof Error ? failed[0].reason.message : String(failed[0].reason));
+  }
+
+  return { status: "ok", rows: totalRows };
 }
