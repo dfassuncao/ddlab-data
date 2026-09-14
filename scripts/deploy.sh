@@ -16,11 +16,23 @@ set -euo pipefail
 
 npx wrangler deploy
 
+# `wrangler secret put` logo após `wrangler deploy` às vezes esbarra numa race
+# condition da API do Cloudflare: a versão recém-deployada ainda não é
+# reconhecida como "a atual" por um instante ("latest version of your Worker
+# isn't currently deployed"). Tenta de novo algumas vezes com um pequeno
+# delay antes de desistir.
 put_secret() {
   local name="$1" value="${2:-}"
-  if [ -n "$value" ]; then
-    printf '%s' "$value" | npx wrangler secret put "$name"
-  fi
+  if [ -z "$value" ]; then return 0; fi
+  for attempt in 1 2 3 4; do
+    if printf '%s' "$value" | npx wrangler secret put "$name"; then
+      return 0
+    fi
+    echo "put_secret $name: tentativa $attempt falhou, tentando de novo em 5s..." >&2
+    sleep 5
+  done
+  echo "put_secret $name: falhou após 4 tentativas." >&2
+  return 1
 }
 
 put_secret CF_ACCESS_TEAM_DOMAIN "${CF_ACCESS_TEAM_DOMAIN:-}"
