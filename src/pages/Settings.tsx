@@ -32,6 +32,7 @@ export function Settings() {
         ga4_dataset?: string;
         ga4_key_events?: string;
         gsc_dataset?: string;
+        ai_provider?: string;
       }
     >
   >({});
@@ -141,6 +142,7 @@ export function Settings() {
                         ga4_key_events:
                           pe.ga4_key_events !== undefined ? pe.ga4_key_events.trim() : undefined,
                         gsc_dataset: pe.gsc_dataset !== undefined ? pe.gsc_dataset.trim() : undefined,
+                        ai_provider: pe.ai_provider,
                       })
                     }
                   >
@@ -156,6 +158,21 @@ export function Settings() {
                     setProfileEdit((s) => ({ ...s, [a.id]: { ...s[a.id], profile_notes: ev.target.value } }))
                   }
                 />
+                <div className="mb-2 flex gap-3 text-xs">
+                  <label className="flex items-center gap-1.5">
+                    IA (Análise/Diagnóstico/Classificação de termos)
+                    <select
+                      className="rounded border border-slate-300 px-2 py-1"
+                      defaultValue={a.ai_provider ?? "gemini"}
+                      onChange={(ev) =>
+                        setProfileEdit((s) => ({ ...s, [a.id]: { ...s[a.id], ai_provider: ev.target.value } }))
+                      }
+                    >
+                      <option value="gemini">Gemini 3.7 Flash</option>
+                      <option value="claude">Claude</option>
+                    </select>
+                  </label>
+                </div>
                 <div className="flex gap-3 text-xs">
                   <label className="flex items-center gap-1.5">
                     Ticket mínimo relevante

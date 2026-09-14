@@ -599,8 +599,12 @@ reports.post("/settings/account", async (c) => {
     ga4_dataset?: string | null;
     ga4_key_events?: string | null;
     gsc_dataset?: string | null;
+    ai_provider?: string | null;
   }>();
   if (!body.id) return c.json({ error: "id obrigatório" }, 400);
+  if (body.ai_provider != null && !["gemini", "claude"].includes(body.ai_provider)) {
+    return c.json({ error: "ai_provider deve ser 'gemini' ou 'claude'" }, 400);
+  }
   await c.env.DB.prepare(
     `UPDATE dim_account SET
        target_cpa = COALESCE(?, target_cpa),
@@ -612,7 +616,8 @@ reports.post("/settings/account", async (c) => {
        lead_goal_monthly = COALESCE(?, lead_goal_monthly),
        ga4_dataset = COALESCE(?, ga4_dataset),
        ga4_key_events = COALESCE(?, ga4_key_events),
-       gsc_dataset = COALESCE(?, gsc_dataset)
+       gsc_dataset = COALESCE(?, gsc_dataset),
+       ai_provider = COALESCE(?, ai_provider)
      WHERE id = ?`,
   )
     .bind(
@@ -626,6 +631,7 @@ reports.post("/settings/account", async (c) => {
       body.ga4_dataset ?? null,
       body.ga4_key_events ?? null,
       body.gsc_dataset ?? null,
+      body.ai_provider ?? null,
       body.id,
     )
     .run();

@@ -22,6 +22,8 @@ export interface Account {
   ga4_key_events: string | null;
   /** Dataset do bulk export do Search Console (ex.: searchconsole_doin), no mesmo projeto GCP */
   gsc_dataset: string | null;
+  /** Provedor de IA usado em Análise IA, Diagnóstico IA e Classificação de termos: "gemini" | "claude" */
+  ai_provider: string;
 }
 
 export interface Totals {

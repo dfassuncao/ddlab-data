@@ -9,6 +9,7 @@ export interface Env {
   CF_ACCESS_TEAM_DOMAIN: string;
   CF_ACCESS_AUD: string;
   ANTHROPIC_MODEL: string;
+  GEMINI_MODEL?: string;
   /** "production" em produção (wrangler.toml). Ausente em dev local (.dev.vars não define). */
   ENVIRONMENT?: string;
 
@@ -16,6 +17,7 @@ export interface Env {
   GCP_SA_KEY: string;
   REFRESH_TOKEN?: string;
   ANTHROPIC_API_KEY?: string;
+  GEMINI_API_KEY?: string;
 
   // Google Ads API (Keyword Planner — volume de busca). OAuth2 de usuário,
   // não service account; requer developer token aprovado pelo Google.

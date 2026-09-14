@@ -38,7 +38,11 @@ BQ_MCC_SUFFIX = "9123420378"
 # scripts/deploy.sh tentando recriá-las como secret ("Binding name ... already
 # in use", erro 10053), derrubando o próprio deploy. Nunca redeclare essas
 # duas aqui.
-# Modelo usado na Análise IA (chave via `wrangler secret put ANTHROPIC_API_KEY`)
+# Modelos usados na Análise IA / Diagnóstico IA / Classificação de termos.
+# Provedor padrão é o Gemini (mais barato); Claude fica disponível por conta
+# em Configurações (campo ai_provider). Chaves via `wrangler secret put
+# GEMINI_API_KEY` / `ANTHROPIC_API_KEY`.
+GEMINI_MODEL = "gemini-3.7-flash"
 ANTHROPIC_MODEL = "claude-sonnet-5"
 
 [observability]
