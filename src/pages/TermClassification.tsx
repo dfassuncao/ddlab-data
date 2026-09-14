@@ -27,9 +27,21 @@ type ClassificationRow = {
   classified: boolean;
 };
 
+// Cor por origem do termo: só Ads = verde, só GSC = amarelo, as duas = azul.
+const ORIGEM_ROW_BG: Record<string, string> = {
+  "Google Ads": "bg-emerald-50",
+  "Search Console": "bg-amber-50",
+  "Google Ads e Search Console": "bg-blue-50",
+};
+
+const LEGENDA = [
+  { cor: "bg-emerald-400", label: "Somente Google Ads" },
+  { cor: "bg-amber-400", label: "Somente Search Console" },
+  { cor: "bg-blue-400", label: "Ambos" },
+];
+
 const COLUMNS: Column<ClassificationRow>[] = [
   { key: "term", header: "Termo", render: (r) => r.term },
-  { key: "origem_dados", header: "Origem", render: (r) => r.origem_dados ?? "—" },
   {
     key: "ads_clicks",
     header: "Cliques (Ads)",
@@ -56,14 +68,18 @@ const COLUMNS: Column<ClassificationRow>[] = [
     header: "Classificação principal",
     render: (r) => r.classificacao_principal ?? "—",
   },
-  { key: "etiquetas", header: "Etiquetas", render: (r) => r.etiquetas ?? "—" },
   { key: "intencao_busca", header: "Intenção", render: (r) => r.intencao_busca ?? "—" },
   { key: "etapa_funil", header: "Etapa do funil", render: (r) => r.etapa_funil ?? "—" },
   { key: "temperatura", header: "Temperatura", render: (r) => r.temperatura ?? "—" },
   { key: "relevancia", header: "Relevância", render: (r) => r.relevancia ?? "—" },
   { key: "potencial_conversao", header: "Potencial conversão", render: (r) => r.potencial_conversao ?? "—" },
-  { key: "cobertura_atual", header: "Cobertura atual", render: (r) => r.cobertura_atual ?? "—" },
   { key: "acao_recomendada", header: "Ação recomendada", render: (r) => r.acao_recomendada ?? "—" },
+  {
+    key: "etiquetas",
+    header: "Etiquetas",
+    className: "whitespace-nowrap",
+    render: (r) => r.etiquetas ?? "—",
+  },
 ];
 
 export function TermClassification() {
@@ -134,6 +150,14 @@ export function TermClassification() {
               {filtered.length} de {rows.length} termos
               {semClassificacao > 0 ? ` · ${semClassificacao} ainda sem classificação` : ""}
             </p>
+            <div className="ml-auto flex items-center gap-3 text-xs text-slate-500">
+              {LEGENDA.map((l) => (
+                <span key={l.label} className="flex items-center gap-1.5">
+                  <span className={`h-2.5 w-2.5 rounded-sm ${l.cor}`} />
+                  {l.label}
+                </span>
+              ))}
+            </div>
           </div>
 
           <DataTable
@@ -142,6 +166,7 @@ export function TermClassification() {
             initialSort={{ key: "ads_clicks", dir: "desc" }}
             columns={COLUMNS}
             stickyFirstColumn
+            rowClassName={(r) => (r.origem_dados ? ORIGEM_ROW_BG[r.origem_dados] : undefined)}
           />
         </>
       )}

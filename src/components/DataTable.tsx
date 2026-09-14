@@ -19,6 +19,7 @@ export function DataTable<T extends Record<string, any>>({
   initialSort,
   rowKey,
   stickyFirstColumn,
+  rowClassName,
 }: {
   rows: T[];
   columns: Column<T>[];
@@ -26,6 +27,8 @@ export function DataTable<T extends Record<string, any>>({
   rowKey: (row: T) => string;
   /** Fixa a primeira coluna ao rolar horizontalmente (útil em tabelas com muitas colunas). */
   stickyFirstColumn?: boolean;
+  /** Classe(s) de fundo por linha (ex.: cor por categoria) — aplicada na linha inteira, inclusive na coluna fixa. */
+  rowClassName?: (row: T) => string | undefined;
 }) {
   const [sort, setSort] = useState(initialSort ?? { key: columns[0].key, dir: "desc" as const });
   const [page, setPage] = useState(0);
@@ -74,20 +77,26 @@ export function DataTable<T extends Record<string, any>>({
           </tr>
         </thead>
         <tbody>
-          {paged.map((row) => (
-            <tr key={rowKey(row)} className="group border-b border-slate-100 last:border-0 hover:bg-slate-50">
-              {columns.map((c, i) => (
-                <td
-                  key={c.key}
-                  className={`px-3 py-2 ${c.align === "right" ? "num text-right" : ""} ${c.className ?? ""} ${stickyCls(i)} ${
-                    stickyCls(i) && "bg-white group-hover:bg-slate-50"
-                  }`}
-                >
-                  {c.render ? c.render(row) : String(row[c.key] ?? "—")}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {paged.map((row) => {
+            const rowBg = rowClassName?.(row) ?? "";
+            return (
+              <tr
+                key={rowKey(row)}
+                className={`group border-b border-slate-100 last:border-0 hover:brightness-[0.97] ${rowBg}`}
+              >
+                {columns.map((c, i) => (
+                  <td
+                    key={c.key}
+                    className={`px-3 py-2 ${c.align === "right" ? "num text-right" : ""} ${c.className ?? ""} ${stickyCls(i)} ${
+                      stickyCls(i) ? rowBg || "bg-white" : ""
+                    }`}
+                  >
+                    {c.render ? c.render(row) : String(row[c.key] ?? "—")}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
           {sorted.length === 0 && (
             <tr>
               <td colSpan={columns.length} className="px-3 py-8 text-center text-slate-400">
