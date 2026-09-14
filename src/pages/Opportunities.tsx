@@ -3,7 +3,7 @@ import { api } from "../lib/api";
 import { usePage } from "../lib/usePage";
 import { PageHeader, QueryState } from "../components/PageHeader";
 import { DataTable } from "../components/DataTable";
-import { brl, dec, int, pct } from "../lib/format";
+import { brl, dec, int, pct, sumBy } from "../lib/format";
 
 export function Opportunities() {
   const { accounts, account, f } = usePage();
@@ -56,13 +56,26 @@ export function Opportunities() {
                     </span>
                   ),
                 },
-                { key: "cost", header: "Custo", align: "right", render: (r) => brl(r.cost, cur) },
-                { key: "conversions", header: "Conv.", align: "right", render: (r) => dec(r.conversions, 1) },
+                {
+                  key: "cost",
+                  header: "Custo",
+                  align: "right",
+                  render: (r) => brl(r.cost, cur),
+                  total: (rows) => brl(sumBy(rows, "cost"), cur),
+                },
+                {
+                  key: "conversions",
+                  header: "Conv.",
+                  align: "right",
+                  render: (r) => dec(r.conversions, 1),
+                  total: (rows) => dec(sumBy(rows, "conversions"), 1),
+                },
                 {
                   key: "conversions_value",
                   header: "Valor gerado",
                   align: "right",
                   render: (r) => brl(r.conversions_value, cur),
+                  total: (rows) => brl(sumBy(rows, "conversions_value"), cur),
                 },
                 { key: "ticket_medio", header: "Ticket médio", align: "right", render: (r) => brl(r.ticket_medio, cur) },
                 {
@@ -90,8 +103,20 @@ export function Opportunities() {
               initialSort={{ key: "cpa", dir: "asc" }}
               columns={[
                 { key: "label", header: "Campanha", render: (r) => r.label },
-                { key: "cost", header: "Custo", align: "right", render: (r) => brl(r.cost, cur) },
-                { key: "conversions", header: "Conv.", align: "right", render: (r) => dec(r.conversions, 1) },
+                {
+                  key: "cost",
+                  header: "Custo",
+                  align: "right",
+                  render: (r) => brl(r.cost, cur),
+                  total: (rows) => brl(sumBy(rows, "cost"), cur),
+                },
+                {
+                  key: "conversions",
+                  header: "Conv.",
+                  align: "right",
+                  render: (r) => dec(r.conversions, 1),
+                  total: (rows) => dec(sumBy(rows, "conversions"), 1),
+                },
                 { key: "cpa", header: "CPA", align: "right", render: (r) => brl(r.cpa, cur) },
               ]}
             />
@@ -107,9 +132,27 @@ export function Opportunities() {
               initialSort={{ key: "conversions", dir: "desc" }}
               columns={[
                 { key: "label", header: "Termo", render: (r) => r.label },
-                { key: "clicks", header: "Cliques", align: "right", render: (r) => int(r.clicks) },
-                { key: "cost", header: "Custo", align: "right", render: (r) => brl(r.cost, cur) },
-                { key: "conversions", header: "Conv.", align: "right", render: (r) => dec(r.conversions, 1) },
+                {
+                  key: "clicks",
+                  header: "Cliques",
+                  align: "right",
+                  render: (r) => int(r.clicks),
+                  total: (rows) => int(sumBy(rows, "clicks")),
+                },
+                {
+                  key: "cost",
+                  header: "Custo",
+                  align: "right",
+                  render: (r) => brl(r.cost, cur),
+                  total: (rows) => brl(sumBy(rows, "cost"), cur),
+                },
+                {
+                  key: "conversions",
+                  header: "Conv.",
+                  align: "right",
+                  render: (r) => dec(r.conversions, 1),
+                  total: (rows) => dec(sumBy(rows, "conversions"), 1),
+                },
                 { key: "cpa", header: "CPA", align: "right", render: (r) => brl(r.cpa, cur) },
               ]}
             />
@@ -125,8 +168,20 @@ export function Opportunities() {
               initialSort={{ key: "conversions", dir: "desc" }}
               columns={[
                 { key: "label", header: "Local (ID)", render: (r) => r.label },
-                { key: "cost", header: "Custo", align: "right", render: (r) => brl(r.cost, cur) },
-                { key: "conversions", header: "Conv.", align: "right", render: (r) => dec(r.conversions, 1) },
+                {
+                  key: "cost",
+                  header: "Custo",
+                  align: "right",
+                  render: (r) => brl(r.cost, cur),
+                  total: (rows) => brl(sumBy(rows, "cost"), cur),
+                },
+                {
+                  key: "conversions",
+                  header: "Conv.",
+                  align: "right",
+                  render: (r) => dec(r.conversions, 1),
+                  total: (rows) => dec(sumBy(rows, "conversions"), 1),
+                },
                 { key: "cpa", header: "CPA", align: "right", render: (r) => brl(r.cpa, cur) },
               ]}
             />

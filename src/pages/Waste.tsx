@@ -3,7 +3,7 @@ import { api } from "../lib/api";
 import { usePage } from "../lib/usePage";
 import { PageHeader, QueryState } from "../components/PageHeader";
 import { DataTable } from "../components/DataTable";
-import { brl, int } from "../lib/format";
+import { brl, int, sumBy } from "../lib/format";
 
 const SCOPE_PT: Record<string, string> = {
   campaign: "Campanha",
@@ -56,8 +56,20 @@ export function Waste() {
             columns={[
               { key: "scope", header: "Tipo", render: (r) => SCOPE_PT[r.scope] ?? r.scope },
               { key: "label", header: "Item", render: (r) => r.label },
-              { key: "clicks", header: "Cliques", align: "right", render: (r) => int(r.clicks) },
-              { key: "cost", header: "Custo", align: "right", render: (r) => brl(r.cost, cur) },
+              {
+                key: "clicks",
+                header: "Cliques",
+                align: "right",
+                render: (r) => int(r.clicks),
+                total: (rows) => int(sumBy(rows, "clicks")),
+              },
+              {
+                key: "cost",
+                header: "Custo",
+                align: "right",
+                render: (r) => brl(r.cost, cur),
+                total: (rows) => brl(sumBy(rows, "cost"), cur),
+              },
             ]}
           />
         </>

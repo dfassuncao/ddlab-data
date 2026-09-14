@@ -1,15 +1,39 @@
 import type { Column } from "../components/DataTable";
-import { brl, int, dec, pct } from "./format";
+import { brl, int, dec, pct, sumBy } from "./format";
 
 type Row = Record<string, any>;
 
 export const metricCols = (currency = "BRL"): Column<Row>[] => [
-  { key: "impressions", header: "Impr.", align: "right", render: (r) => int(r.impressions) },
-  { key: "clicks", header: "Cliques", align: "right", render: (r) => int(r.clicks) },
+  {
+    key: "impressions",
+    header: "Impr.",
+    align: "right",
+    render: (r) => int(r.impressions),
+    total: (rows) => int(sumBy(rows, "impressions")),
+  },
+  {
+    key: "clicks",
+    header: "Cliques",
+    align: "right",
+    render: (r) => int(r.clicks),
+    total: (rows) => int(sumBy(rows, "clicks")),
+  },
   { key: "ctr", header: "CTR", align: "right", render: (r) => pct(r.ctr) },
-  { key: "cost", header: "Custo", align: "right", render: (r) => brl(r.cost, currency) },
+  {
+    key: "cost",
+    header: "Custo",
+    align: "right",
+    render: (r) => brl(r.cost, currency),
+    total: (rows) => brl(sumBy(rows, "cost"), currency),
+  },
   { key: "cpc", header: "CPC", align: "right", render: (r) => brl(r.cpc, currency) },
-  { key: "conversions", header: "Conv.", align: "right", render: (r) => dec(r.conversions, 1) },
+  {
+    key: "conversions",
+    header: "Conv.",
+    align: "right",
+    render: (r) => dec(r.conversions, 1),
+    total: (rows) => dec(sumBy(rows, "conversions"), 1),
+  },
   { key: "cvr", header: "CVR", align: "right", render: (r) => pct(r.cvr) },
   {
     key: "cpa",

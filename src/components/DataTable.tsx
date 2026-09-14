@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export interface Column<T> {
   key: string;
@@ -7,7 +7,11 @@ export interface Column<T> {
   render?: (row: T) => React.ReactNode;
   sortValue?: (row: T) => number | string;
   className?: string;
+  /** Quando definido, soma a coluna no rodapé com base em TODAS as linhas (não só a página atual). */
+  total?: (rows: T[]) => React.ReactNode;
 }
+
+const PAGE_SIZE = 50;
 
 export function DataTable<T extends Record<string, any>>({
   rows,
@@ -21,6 +25,7 @@ export function DataTable<T extends Record<string, any>>({
   rowKey: (row: T) => string;
 }) {
   const [sort, setSort] = useState(initialSort ?? { key: columns[0].key, dir: "desc" as const });
+  const [page, setPage] = useState(0);
 
   const sorted = useMemo(() => {
     const col = columns.find((c) => c.key === sort.key);
@@ -33,6 +38,12 @@ export function DataTable<T extends Record<string, any>>({
       return sort.dir === "asc" ? cmp : -cmp;
     });
   }, [rows, columns, sort]);
+
+  const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  useEffect(() => setPage(0), [rows, sort.key, sort.dir]);
+  const clampedPage = Math.min(page, pageCount - 1);
+  const paged = sorted.slice(clampedPage * PAGE_SIZE, clampedPage * PAGE_SIZE + PAGE_SIZE);
+  const hasTotals = columns.some((c) => c.total);
 
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
@@ -59,7 +70,7 @@ export function DataTable<T extends Record<string, any>>({
           </tr>
         </thead>
         <tbody>
-          {sorted.map((row) => (
+          {paged.map((row) => (
             <tr key={rowKey(row)} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
               {columns.map((c) => (
                 <td
@@ -79,7 +90,44 @@ export function DataTable<T extends Record<string, any>>({
             </tr>
           )}
         </tbody>
+        {hasTotals && sorted.length > 0 && (
+          <tfoot>
+            <tr className="border-t-2 border-slate-200 bg-slate-50 font-medium">
+              {columns.map((c, i) => (
+                <td key={c.key} className={`px-3 py-2 ${c.align === "right" ? "num text-right" : ""}`}>
+                  {c.total ? c.total(sorted) : i === 0 ? "Total" : ""}
+                </td>
+              ))}
+            </tr>
+          </tfoot>
+        )}
       </table>
+      {sorted.length > PAGE_SIZE && (
+        <div className="flex items-center justify-between border-t border-slate-200 px-3 py-2 text-xs text-slate-500">
+          <span>
+            {clampedPage * PAGE_SIZE + 1}–{Math.min((clampedPage + 1) * PAGE_SIZE, sorted.length)} de {sorted.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={clampedPage === 0}
+              className="rounded border border-slate-300 px-2 py-1 disabled:opacity-40"
+            >
+              Anterior
+            </button>
+            <span>
+              Página {clampedPage + 1} de {pageCount}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+              disabled={clampedPage >= pageCount - 1}
+              className="rounded border border-slate-300 px-2 py-1 disabled:opacity-40"
+            >
+              Próxima
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
