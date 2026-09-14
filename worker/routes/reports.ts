@@ -510,16 +510,20 @@ reports.get("/term-classification", async (c) => {
   const rows = await q(
     c.env,
     `WITH ads AS (
-       SELECT LOWER(TRIM(search_term)) AS term, SUM(clicks) AS clicks, SUM(cost) AS cost
+       SELECT LOWER(TRIM(search_term)) AS term, SUM(clicks) AS clicks, SUM(cost) AS cost,
+         SUM(impressions) AS impressions, SUM(conversions) AS conversions
        FROM fact_searchterm_daily WHERE account_id=? AND day>=? AND day<=? GROUP BY term
      ),
      gsc AS (
-       SELECT LOWER(TRIM(query)) AS term, SUM(clicks) AS clicks
+       SELECT LOWER(TRIM(query)) AS term, SUM(clicks) AS clicks, SUM(impressions) AS impressions,
+         ROUND(AVG(position), 1) AS position
        FROM fact_gsc_query_daily WHERE account_id=? AND day>=? AND day<=? GROUP BY term
      ),
      terms AS (SELECT term FROM ads UNION SELECT term FROM gsc)
      SELECT t.term,
-       COALESCE(a.clicks, 0) AS ads_clicks, COALESCE(a.cost, 0) AS ads_cost, COALESCE(g.clicks, 0) AS gsc_clicks,
+       COALESCE(a.clicks, 0) AS ads_clicks, COALESCE(a.cost, 0) AS ads_cost,
+       COALESCE(a.impressions, 0) AS ads_impressions, COALESCE(a.conversions, 0) AS ads_conversions,
+       COALESCE(g.clicks, 0) AS gsc_clicks, COALESCE(g.impressions, 0) AS gsc_impressions, g.position AS gsc_position,
        cl.classificacao_principal, cl.etiquetas, cl.intencao_busca, cl.etapa_funil, cl.temperatura,
        cl.relevancia, cl.adequacao_publico, cl.localidade, cl.relacionamento_marca, cl.potencial_conversao,
        cl.origem_dados, cl.cobertura_atual, cl.acao_recomendada, cl.updated_at
@@ -536,7 +540,11 @@ reports.get("/term-classification", async (c) => {
     term: r.term ?? "(consulta anônima)",
     ads_clicks: r.ads_clicks ?? 0,
     ads_cost: r.ads_cost ?? 0,
+    ads_impressions: r.ads_impressions ?? 0,
+    ads_conversions: r.ads_conversions ?? 0,
     gsc_clicks: r.gsc_clicks ?? 0,
+    gsc_impressions: r.gsc_impressions ?? 0,
+    gsc_position: r.gsc_position ?? null,
     classificacao_principal: r.classificacao_principal ?? null,
     etiquetas: r.etiquetas ?? null,
     intencao_busca: r.intencao_busca ?? null,
