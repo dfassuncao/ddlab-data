@@ -61,7 +61,6 @@ const COLUMNS: Column<ClassificationRow>[] = [
   { key: "etapa_funil", header: "Etapa do funil", render: (r) => r.etapa_funil ?? "—" },
   { key: "temperatura", header: "Temperatura", render: (r) => r.temperatura ?? "—" },
   { key: "relevancia", header: "Relevância", render: (r) => r.relevancia ?? "—" },
-  { key: "relacionamento_marca", header: "Relação c/ marca", render: (r) => r.relacionamento_marca ?? "—" },
   { key: "potencial_conversao", header: "Potencial conversão", render: (r) => r.potencial_conversao ?? "—" },
   { key: "cobertura_atual", header: "Cobertura atual", render: (r) => r.cobertura_atual ?? "—" },
   { key: "acao_recomendada", header: "Ação recomendada", render: (r) => r.acao_recomendada ?? "—" },
@@ -142,6 +141,7 @@ export function TermClassification() {
             rowKey={(r) => r.term}
             initialSort={{ key: "ads_clicks", dir: "desc" }}
             columns={COLUMNS}
+            stickyFirstColumn
           />
         </>
       )}
