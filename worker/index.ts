@@ -37,18 +37,28 @@ app.get("/api/introspect", async (c) => {
   }
 });
 
+// Facts que o usuário dispara manualmente e fica esperando o resultado —
+// rodar em waitUntil não serve pra eles: esse background morre 30s depois da
+// resposta ser enviada (limite fixo do Cloudflare, não configurável), e sem
+// teto de termos/contas isso estoura fácil. Para esses, aguardamos terminar
+// antes de responder (sujeito só ao CPU-time normal, que não conta tempo de
+// rede) e devolvemos o resultado de verdade em vez de {started:true}.
+const SYNC_FACTS = new Set(["term_classification", "keyword_volume"]);
+
 // Refresh manual (backfill sob demanda). ?account=&days=&facts=campaign,keyword
 app.post("/api/refresh", async (c) => {
   const account = c.req.query("account") || undefined;
   const days = c.req.query("days") ? Number(c.req.query("days")) : undefined;
   const facts = c.req.query("facts")?.split(",").filter(Boolean);
-  c.executionCtx.waitUntil(
-    runEtl(c.env, {
-      accountIds: account ? [account] : undefined,
-      lookbackDays: days,
-      facts,
-    }).catch((e) => console.error("manual etl failed", e)),
-  );
+
+  const opts = { accountIds: account ? [account] : undefined, lookbackDays: days, facts };
+
+  if (facts?.length && facts.every((f) => SYNC_FACTS.has(f))) {
+    const results = await runEtl(c.env, opts);
+    return c.json({ done: true, account: account ?? "all", days: days ?? "default", facts, results });
+  }
+
+  c.executionCtx.waitUntil(runEtl(c.env, opts).catch((e) => console.error("manual etl failed", e)));
   return c.json({ started: true, account: account ?? "all", days: days ?? "default", facts: facts ?? "all" });
 });
 
