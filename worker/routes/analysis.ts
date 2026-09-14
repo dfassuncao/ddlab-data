@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { Env } from "../env";
 import type { AccessUser } from "../auth";
 import { getAccount } from "../db";
-import { callClaude } from "../claude";
+import { callAI } from "../ai";
 import { resolveRange, previousRange, round } from "../kpi";
 
 type Vars = { Variables: { user: AccessUser }; Bindings: Env };
@@ -441,8 +441,9 @@ analysis.post("/diagnostico", async (c) => {
   }
 
   try {
-    const result = await callClaude(
+    const result = await callAI(
       c.env,
+      account!.ai_provider,
       DIAGNOSTICO_PROMPT,
       `Dados agregados da conta "${account!.name}" (${from} a ${to}):\n\n${JSON.stringify(context)}`,
     );
@@ -479,8 +480,9 @@ analysis.post("/analysis", async (c) => {
   }
 
   try {
-    const result = await callClaude(
+    const result = await callAI(
       c.env,
+      account!.ai_provider,
       SYSTEM_PROMPT,
       `Dados agregados da conta "${account!.name}" (${from} a ${to}):\n\n${JSON.stringify(context)}`,
     );

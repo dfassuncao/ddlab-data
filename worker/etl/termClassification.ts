@@ -1,11 +1,11 @@
 import type { Env } from "../env";
-import { callClaude } from "../claude";
+import { callAI } from "../ai";
 import { bulkInsert, chunk } from "../db";
 
 /**
  * Classificação por IA (marca própria, concorrente, intenção de busca, etapa
  * do funil etc.) de cada termo de busca do Ads / consulta do GSC. Não entra
- * no cron diário (custa API da Anthropic) — só roda sob demanda via
+ * no cron diário (custa API do provedor de IA) — só roda sob demanda via
  * ?facts=term_classification em /api/refresh, como o keyword_volume.
  */
 
@@ -122,7 +122,7 @@ interface ClassificationRow extends Record<string, unknown> {
 
 export async function runTermClassification(
   env: Env,
-  account: { id: string; name: string; profile_notes?: string | null },
+  account: { id: string; name: string; profile_notes?: string | null; ai_provider?: string },
   lookbackDays: number,
 ): Promise<{ status: "ok"; rows: number }> {
   const from = new Date(Date.now() - lookbackDays * 86_400_000).toISOString().slice(0, 10);
@@ -163,7 +163,7 @@ export async function runTermClassification(
         termos: batch.map((t) => ({ termo: t.term, origem_dados: origemByTerm.get(t.term) })),
       });
 
-      const { text } = await callClaude(env, SYSTEM_PROMPT, userContent, MAX_TOKENS);
+      const { text } = await callAI(env, account.ai_provider, SYSTEM_PROMPT, userContent, MAX_TOKENS);
       const parsed = extractJsonArray(text);
 
       const rows: ClassificationRow[] = [];

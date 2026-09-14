@@ -4,7 +4,8 @@ import type { Account } from "../shared/types";
 export async function listAccounts(env: Env, onlyActive = true): Promise<Account[]> {
   const rows = await env.DB.prepare(
     `SELECT id, customer_id, name, currency, timezone, target_cpa, monthly_budget, has_shopping, active,
-            profile_notes, ideal_ticket_min, lead_goal_monthly, ga4_dataset, ga4_key_events, gsc_dataset
+            profile_notes, ideal_ticket_min, lead_goal_monthly, ga4_dataset, ga4_key_events, gsc_dataset,
+            ai_provider
      FROM dim_account ${onlyActive ? "WHERE active = 1" : ""} ORDER BY sort_order, name`,
   ).all<Record<string, unknown>>();
   return (rows.results ?? []).map((r) => ({
@@ -23,6 +24,7 @@ export async function listAccounts(env: Env, onlyActive = true): Promise<Account
     ga4_dataset: (r.ga4_dataset as string) ?? null,
     ga4_key_events: (r.ga4_key_events as string) ?? null,
     gsc_dataset: (r.gsc_dataset as string) ?? null,
+    ai_provider: (r.ai_provider as string) ?? "gemini",
   }));
 }
 

@@ -22,8 +22,12 @@ CF_ACCESS_AUD=
 # em docs/security-audit/ se for implementar de fato.
 REFRESH_TOKEN=
 
-# Análise IA (página "Análise IA"). Chave da conta Anthropic (console.anthropic.com/settings/keys),
-# com billing próprio — é uma chamada de API paga, separada da assinatura do Claude Code.
+# Análise IA / Diagnóstico IA / Classificação de termos. Provedor padrão é o
+# Gemini (mais barato); Claude fica disponível por conta em Configurações
+# (campo ai_provider). Ambas as chaves são de contas separadas com billing
+# próprio, nada a ver com a assinatura do Claude Code.
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-3.7-flash
 ANTHROPIC_API_KEY=
 ANTHROPIC_MODEL=claude-sonnet-5
 
