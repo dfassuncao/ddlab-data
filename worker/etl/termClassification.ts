@@ -10,8 +10,11 @@ import { bulkInsert, chunk } from "../db";
  */
 
 const TERMS_PER_BATCH = 15;
-const MAX_TERMS = 200;
 const MAX_TOKENS = 16000;
+/** Quantos lotes rodam em paralelo por vez — Workers tem limite de conexões
+ * simultâneas por invocação, então sem isso uma conta com milhares de termos
+ * estouraria esse limite. */
+const CONCURRENCY = 20;
 
 const CLASSIFICACOES_PRINCIPAIS = [
   "Marca própria",
@@ -55,10 +58,9 @@ async function fetchCandidateTerms(env: Env, accountId: string, from: string): P
      FROM terms t
      LEFT JOIN ads a ON a.term = t.term
      LEFT JOIN gsc g ON g.term = t.term
-     ORDER BY (COALESCE(a.clicks, 0) + COALESCE(g.clicks, 0)) DESC
-     LIMIT ?`,
+     ORDER BY (COALESCE(a.clicks, 0) + COALESCE(g.clicks, 0)) DESC`,
   )
-    .bind(accountId, from, accountId, from, MAX_TERMS)
+    .bind(accountId, from, accountId, from)
     .all<TermRow>();
   return results ?? [];
 }
@@ -149,56 +151,62 @@ export async function runTermClassification(
     "updated_at",
   ];
 
-  // Lotes disparados em paralelo (não um atrás do outro): com ~200 termos /
-  // 15 por lote isso passa de 14 chamadas sequenciais (minutos, estourando o
-  // orçamento de tempo do waitUntil do Worker) para o tempo de uma única
-  // chamada. Cada lote grava direto no D1 assim que termina, então mesmo que
-  // algum lote falhe os demais não se perdem.
-  const results = await Promise.allSettled(
-    chunk(terms, TERMS_PER_BATCH).map(async (batch) => {
-      const origemByTerm = new Map(batch.map((t) => [t.term, origemDados(t)]));
-      const userContent = JSON.stringify({
-        conta: account.name,
-        briefing_do_cliente: account.profile_notes || null,
-        termos: batch.map((t) => ({ termo: t.term, origem_dados: origemByTerm.get(t.term) })),
+  async function runBatch(batch: TermRow[]): Promise<number> {
+    const origemByTerm = new Map(batch.map((t) => [t.term, origemDados(t)]));
+    const userContent = JSON.stringify({
+      conta: account.name,
+      briefing_do_cliente: account.profile_notes || null,
+      termos: batch.map((t) => ({ termo: t.term, origem_dados: origemByTerm.get(t.term) })),
+    });
+
+    const { text } = await callAI(env, account.ai_provider, SYSTEM_PROMPT, userContent, MAX_TOKENS);
+    const parsed = extractJsonArray(text);
+
+    const rows: ClassificationRow[] = [];
+    for (const item of parsed) {
+      const term = String(item.termo ?? "").toLowerCase().trim();
+      if (!term || !origemByTerm.has(term)) continue;
+      rows.push({
+        account_id: account.id,
+        term,
+        classificacao_principal: item.classificacao_principal ?? null,
+        etiquetas: Array.isArray(item.etiquetas) ? item.etiquetas.join(", ") : null,
+        intencao_busca: item.intencao_busca ?? null,
+        etapa_funil: item.etapa_funil ?? null,
+        temperatura: item.temperatura ?? null,
+        relevancia: item.relevancia ?? null,
+        adequacao_publico: item.adequacao_publico ?? null,
+        localidade: item.localidade ?? null,
+        relacionamento_marca: item.relacionamento_marca ?? null,
+        potencial_conversao: item.potencial_conversao ?? null,
+        origem_dados: origemByTerm.get(term)!,
+        cobertura_atual: item.cobertura_atual ?? null,
+        acao_recomendada: item.acao_recomendada ?? null,
+        updated_at: now,
       });
+    }
 
-      const { text } = await callAI(env, account.ai_provider, SYSTEM_PROMPT, userContent, MAX_TOKENS);
-      const parsed = extractJsonArray(text);
+    await bulkInsert(env, "fact_term_classification", columns, rows);
+    return rows.length;
+  }
 
-      const rows: ClassificationRow[] = [];
-      for (const item of parsed) {
-        const term = String(item.termo ?? "").toLowerCase().trim();
-        if (!term || !origemByTerm.has(term)) continue;
-        rows.push({
-          account_id: account.id,
-          term,
-          classificacao_principal: item.classificacao_principal ?? null,
-          etiquetas: Array.isArray(item.etiquetas) ? item.etiquetas.join(", ") : null,
-          intencao_busca: item.intencao_busca ?? null,
-          etapa_funil: item.etapa_funil ?? null,
-          temperatura: item.temperatura ?? null,
-          relevancia: item.relevancia ?? null,
-          adequacao_publico: item.adequacao_publico ?? null,
-          localidade: item.localidade ?? null,
-          relacionamento_marca: item.relacionamento_marca ?? null,
-          potencial_conversao: item.potencial_conversao ?? null,
-          origem_dados: origemByTerm.get(term)!,
-          cobertura_atual: item.cobertura_atual ?? null,
-          acao_recomendada: item.acao_recomendada ?? null,
-          updated_at: now,
-        });
-      }
+  // Roda em "ondas" de até CONCURRENCY lotes simultâneos (não tudo de uma vez
+  // nem um atrás do outro): paralelo o bastante pra não estourar o tempo de
+  // background do Worker, mas sem passar do limite de conexões simultâneas
+  // por invocação — importante agora que não há mais teto de termos por conta.
+  const batches = chunk(terms, TERMS_PER_BATCH);
+  let totalRows = 0;
+  let lastError: unknown = null;
+  for (const wave of chunk(batches, CONCURRENCY)) {
+    const results = await Promise.allSettled(wave.map(runBatch));
+    for (const r of results) {
+      if (r.status === "fulfilled") totalRows += r.value;
+      else lastError = r.reason;
+    }
+  }
 
-      await bulkInsert(env, "fact_term_classification", columns, rows);
-      return rows.length;
-    }),
-  );
-
-  const totalRows = results.reduce((sum, r) => sum + (r.status === "fulfilled" ? r.value : 0), 0);
-  const failed = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
-  if (failed.length > 0 && totalRows === 0) {
-    throw new Error(failed[0].reason instanceof Error ? failed[0].reason.message : String(failed[0].reason));
+  if (lastError && totalRows === 0) {
+    throw new Error(lastError instanceof Error ? lastError.message : String(lastError));
   }
 
   return { status: "ok", rows: totalRows };
