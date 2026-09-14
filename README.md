@@ -93,4 +93,6 @@ de termos**) são exceção: **nunca** rodam com `facts` vazio/todos — só qua
 pedidos explicitamente (`?facts=keyword_volume` / `?facts=term_classification`),
 porque consomem quota da API do Google Ads / API da Anthropic e mudam pouco
 mês a mês. `keyword_volume` requer as 5 vars `GOOGLE_ADS_*` (ver DEPLOY.md);
-`term_classification` requer `ANTHROPIC_API_KEY` (já usado pela Análise IA).
+`term_classification` classifica TODOS os termos de busca (Ads) e consultas
+(GSC) da conta no período, sem limite — requer `GEMINI_API_KEY` (padrão) ou
+`ANTHROPIC_API_KEY` (se a conta usar Claude, ver campo "IA" em Configurações).

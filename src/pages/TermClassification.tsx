@@ -35,9 +35,9 @@ const ORIGEM_ROW_BG: Record<string, string> = {
 };
 
 const LEGENDA = [
-  { cor: "bg-emerald-400", label: "Somente Google Ads" },
-  { cor: "bg-amber-400", label: "Somente Search Console" },
-  { cor: "bg-blue-400", label: "Ambos" },
+  { cor: "bg-emerald-400", label: "Somente Google Ads", origem: "Google Ads" },
+  { cor: "bg-amber-400", label: "Somente Search Console", origem: "Search Console" },
+  { cor: "bg-blue-400", label: "Ambos", origem: "Google Ads e Search Console" },
 ];
 
 const COLUMNS: Column<ClassificationRow>[] = [
@@ -85,6 +85,7 @@ const COLUMNS: Column<ClassificationRow>[] = [
 export function TermClassification() {
   const { accounts, account, f } = usePage();
   const [filtroClassificacao, setFiltroClassificacao] = useState("");
+  const [filtroOrigem, setFiltroOrigem] = useState("");
   const [busca, setBusca] = useState("");
 
   const q = useQuery({
@@ -103,6 +104,7 @@ export function TermClassification() {
 
   const filtered = rows.filter((r) => {
     if (filtroClassificacao && r.classificacao_principal !== filtroClassificacao) return false;
+    if (filtroOrigem && r.origem_dados !== filtroOrigem) return false;
     if (busca && !r.term.toLowerCase().includes(busca.toLowerCase())) return false;
     return true;
   });
@@ -152,10 +154,17 @@ export function TermClassification() {
             </p>
             <div className="ml-auto flex items-center gap-3 text-xs text-slate-500">
               {LEGENDA.map((l) => (
-                <span key={l.label} className="flex items-center gap-1.5">
+                <button
+                  key={l.label}
+                  onClick={() => setFiltroOrigem((cur) => (cur === l.origem ? "" : l.origem))}
+                  className={`flex items-center gap-1.5 rounded px-1.5 py-0.5 ${
+                    filtroOrigem === l.origem ? "bg-slate-100 font-medium text-slate-700" : "hover:bg-slate-50"
+                  }`}
+                  title={filtroOrigem === l.origem ? "Clique para remover o filtro" : `Filtrar por ${l.label}`}
+                >
                   <span className={`h-2.5 w-2.5 rounded-sm ${l.cor}`} />
                   {l.label}
-                </span>
+                </button>
               ))}
             </div>
           </div>
