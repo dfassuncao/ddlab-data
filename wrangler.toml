@@ -44,6 +44,7 @@ BQ_MCC_SUFFIX = "9123420378"
 # GEMINI_API_KEY` / `ANTHROPIC_API_KEY`.
 GEMINI_MODEL = "gemini-3.7-flash"
 ANTHROPIC_MODEL = "claude-sonnet-5"
+DEEPSEEK_MODEL = "deepseek-chat"
 
 [observability]
 enabled = true

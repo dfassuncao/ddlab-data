@@ -10,6 +10,7 @@ export interface Env {
   CF_ACCESS_AUD: string;
   ANTHROPIC_MODEL: string;
   GEMINI_MODEL?: string;
+  DEEPSEEK_MODEL?: string;
   /** "production" em produção (wrangler.toml). Ausente em dev local (.dev.vars não define). */
   ENVIRONMENT?: string;
 
@@ -18,6 +19,7 @@ export interface Env {
   REFRESH_TOKEN?: string;
   ANTHROPIC_API_KEY?: string;
   GEMINI_API_KEY?: string;
+  DEEPSEEK_API_KEY?: string;
 
   // Google Ads API (Keyword Planner — volume de busca). OAuth2 de usuário,
   // não service account; requer developer token aprovado pelo Google.

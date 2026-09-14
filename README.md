@@ -9,8 +9,8 @@ Aplicação de inteligência de marketing (Google Ads + GA4 + Search Console) da
 - **Pipeline**: um Cloudflare Worker roda 1x/dia (Cron) e pré‑agrega tudo no Cloudflare **D1**.
 - **App**: SPA React servida pelo mesmo Worker; leitura só do D1 (rápido e barato).
 - **Login**: Cloudflare Access (nada de senha no código) — ver nota de segurança abaixo.
-- **Análise IA**: chamadas sob demanda a um provedor de LLM (Gemini por padrão, Claude opcional
-  por conta em Configurações), com histórico navegável das gerações passadas.
+- **Análise IA**: chamadas sob demanda a um provedor de LLM (Gemini por padrão, Claude ou
+  DeepSeek opcionais por conta em Configurações), com histórico navegável das gerações passadas.
 
 > ⚠️ **Segurança**: em produção, se `CF_ACCESS_TEAM_DOMAIN`/`CF_ACCESS_AUD` não estiverem
 > configurados como *secrets* (não como var de build!) do Worker, a API recusa servir
@@ -94,5 +94,6 @@ pedidos explicitamente (`?facts=keyword_volume` / `?facts=term_classification`),
 porque consomem quota da API do Google Ads / API da Anthropic e mudam pouco
 mês a mês. `keyword_volume` requer as 5 vars `GOOGLE_ADS_*` (ver DEPLOY.md);
 `term_classification` classifica TODOS os termos de busca (Ads) e consultas
-(GSC) da conta no período, sem limite — requer `GEMINI_API_KEY` (padrão) ou
-`ANTHROPIC_API_KEY` (se a conta usar Claude, ver campo "IA" em Configurações).
+(GSC) da conta no período, sem limite — requer `GEMINI_API_KEY` (padrão),
+`ANTHROPIC_API_KEY` (Claude) ou `DEEPSEEK_API_KEY` (DeepSeek), conforme o
+campo "IA" da conta em Configurações.
