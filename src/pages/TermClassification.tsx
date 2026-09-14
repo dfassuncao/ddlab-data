@@ -41,7 +41,7 @@ const LEGENDA = [
 ];
 
 const COLUMNS: Column<ClassificationRow>[] = [
-  { key: "term", header: "Termo", render: (r) => r.term },
+  { key: "term", header: "Termo", className: "whitespace-nowrap", render: (r) => r.term },
   {
     key: "ads_clicks",
     header: "Cliques (Ads)",
