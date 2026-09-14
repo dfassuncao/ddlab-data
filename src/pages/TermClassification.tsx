@@ -4,13 +4,17 @@ import { api } from "../lib/api";
 import { usePage } from "../lib/usePage";
 import { PageHeader, QueryState } from "../components/PageHeader";
 import { DataTable, type Column } from "../components/DataTable";
-import { brl, int, sumBy } from "../lib/format";
+import { brl, int, dec, sumBy } from "../lib/format";
 
 type ClassificationRow = {
   term: string;
   ads_clicks: number;
   ads_cost: number;
+  ads_impressions: number;
+  ads_conversions: number;
   gsc_clicks: number;
+  gsc_impressions: number;
+  gsc_position: number | null;
   classificacao_principal: string | null;
   etiquetas: string | null;
   intencao_busca: string | null;
@@ -43,6 +47,13 @@ const LEGENDA = [
 const COLUMNS: Column<ClassificationRow>[] = [
   { key: "term", header: "Termo", className: "whitespace-nowrap", render: (r) => r.term },
   {
+    key: "ads_impressions",
+    header: "Impr. (Ads)",
+    align: "right",
+    render: (r) => int(r.ads_impressions),
+    total: (rows) => int(sumBy(rows, "ads_impressions")),
+  },
+  {
     key: "ads_clicks",
     header: "Cliques (Ads)",
     align: "right",
@@ -57,11 +68,32 @@ const COLUMNS: Column<ClassificationRow>[] = [
     total: (rows) => brl(sumBy(rows, "ads_cost")),
   },
   {
+    key: "ads_conversions",
+    header: "Conversões (Ads)",
+    align: "right",
+    render: (r) => dec(r.ads_conversions, 1),
+    total: (rows) => dec(sumBy(rows, "ads_conversions"), 1),
+  },
+  {
+    key: "gsc_impressions",
+    header: "Impr. (GSC)",
+    align: "right",
+    render: (r) => int(r.gsc_impressions),
+    total: (rows) => int(sumBy(rows, "gsc_impressions")),
+  },
+  {
     key: "gsc_clicks",
     header: "Cliques (GSC)",
     align: "right",
     render: (r) => int(r.gsc_clicks),
     total: (rows) => int(sumBy(rows, "gsc_clicks")),
+  },
+  {
+    key: "gsc_position",
+    header: "Posição (GSC)",
+    align: "right",
+    render: (r) => (r.gsc_position == null ? "—" : dec(r.gsc_position, 1)),
+    sortValue: (r) => r.gsc_position ?? Number.MAX_SAFE_INTEGER,
   },
   {
     key: "classificacao_principal",
