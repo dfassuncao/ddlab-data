@@ -610,8 +610,8 @@ reports.post("/settings/account", async (c) => {
     ai_provider?: string | null;
   }>();
   if (!body.id) return c.json({ error: "id obrigatório" }, 400);
-  if (body.ai_provider != null && !["gemini", "claude"].includes(body.ai_provider)) {
-    return c.json({ error: "ai_provider deve ser 'gemini' ou 'claude'" }, 400);
+  if (body.ai_provider != null && !["gemini", "claude", "deepseek"].includes(body.ai_provider)) {
+    return c.json({ error: "ai_provider deve ser 'gemini', 'claude' ou 'deepseek'" }, 400);
   }
   await c.env.DB.prepare(
     `UPDATE dim_account SET

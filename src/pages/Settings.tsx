@@ -170,6 +170,7 @@ export function Settings() {
                     >
                       <option value="gemini">Gemini 3.7 Flash</option>
                       <option value="claude">Claude</option>
+                      <option value="deepseek">DeepSeek</option>
                     </select>
                   </label>
                 </div>
