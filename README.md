@@ -86,7 +86,10 @@ fetch('/api/refresh?facts=gsc&days=90', { method: 'POST' }).then(r => r.json()).
 `facts` aceita `campaign,keyword,search_term,geo,hour,device,ad,audience_age,audience_gender,product,landing_page,ga4,gsc`
 (vazio = todos). Omitir `account` roda para todas as contas ativas.
 
-`keyword_volume` (volume de busca do Keyword Planner) é a exceção: **nunca**
-roda com `facts` vazio/todos — só quando pedido explicitamente
-(`?facts=keyword_volume`), porque consome quota da API do Google Ads e muda
-pouco mês a mês. Requer as 5 vars `GOOGLE_ADS_*` configuradas (ver DEPLOY.md).
+`keyword_volume` (volume de busca do Keyword Planner) e `term_classification`
+(classificação por IA dos termos de busca/consultas — página **Classificação
+de termos**) são exceção: **nunca** rodam com `facts` vazio/todos — só quando
+pedidos explicitamente (`?facts=keyword_volume` / `?facts=term_classification`),
+porque consomem quota da API do Google Ads / API da Anthropic e mudam pouco
+mês a mês. `keyword_volume` requer as 5 vars `GOOGLE_ADS_*` (ver DEPLOY.md);
+`term_classification` requer `ANTHROPIC_API_KEY` (já usado pela Análise IA).

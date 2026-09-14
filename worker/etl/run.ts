@@ -5,6 +5,7 @@ import { FACTS, type FactSpec } from "./queries";
 import { runGa4 } from "./ga4";
 import { runGsc } from "./gsc";
 import { runKeywordVolume } from "./keywordVolume";
+import { runTermClassification } from "./termClassification";
 
 const NUM_COLS: Record<string, string[]> = {
   fact_campaign_daily: [
@@ -193,6 +194,20 @@ export async function runEtl(env: Env, opts: EtlOptions = {}) {
         const msg = e instanceof Error ? e.message : String(e);
         await writeMeta(account.id, "keyword_volume", "error", 0, "", msg.slice(0, 500));
         results.push({ account: account.id, fact: "keyword_volume", status: "error", rows: 0, error: msg });
+      }
+    }
+
+    // Classificação por IA dos termos (Ads/GSC) — mesma exceção do keyword_volume:
+    // NUNCA roda no cron, só quando pedido explicitamente (custa API da Anthropic).
+    if (opts.facts?.includes("term_classification")) {
+      try {
+        const { status, rows } = await runTermClassification(env, account, opts.lookbackDays ?? 90);
+        await writeMeta(account.id, "term_classification", status, rows, "", null);
+        results.push({ account: account.id, fact: "term_classification", status, rows });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        await writeMeta(account.id, "term_classification", "error", 0, "", msg.slice(0, 500));
+        results.push({ account: account.id, fact: "term_classification", status: "error", rows: 0, error: msg });
       }
     }
   }

@@ -498,6 +498,63 @@ reports.get("/cruzamento", async (c) => {
   return c.json({ account, range: { from, to }, rows: data });
 });
 
+// Lista os termos (Ads + GSC) com a classificação por IA (quando já rodada
+// via /api/refresh?facts=term_classification). Mesmo universo de termos do
+// /api/cruzamento, mas em página dedicada.
+reports.get("/term-classification", async (c) => {
+  const { account, error } = await accountOr404(c);
+  if (error) return error;
+  const { from, to } = resolveRange(c.req.query("from"), c.req.query("to"));
+  const binds = [account!.id, from, to, account!.id, from, to, account!.id];
+
+  const rows = await q(
+    c.env,
+    `WITH ads AS (
+       SELECT LOWER(TRIM(search_term)) AS term, SUM(clicks) AS clicks, SUM(cost) AS cost
+       FROM fact_searchterm_daily WHERE account_id=? AND day>=? AND day<=? GROUP BY term
+     ),
+     gsc AS (
+       SELECT LOWER(TRIM(query)) AS term, SUM(clicks) AS clicks
+       FROM fact_gsc_query_daily WHERE account_id=? AND day>=? AND day<=? GROUP BY term
+     ),
+     terms AS (SELECT term FROM ads UNION SELECT term FROM gsc)
+     SELECT t.term,
+       COALESCE(a.clicks, 0) AS ads_clicks, COALESCE(a.cost, 0) AS ads_cost, COALESCE(g.clicks, 0) AS gsc_clicks,
+       cl.classificacao_principal, cl.etiquetas, cl.intencao_busca, cl.etapa_funil, cl.temperatura,
+       cl.relevancia, cl.adequacao_publico, cl.localidade, cl.relacionamento_marca, cl.potencial_conversao,
+       cl.origem_dados, cl.cobertura_atual, cl.acao_recomendada, cl.updated_at
+     FROM terms t
+     LEFT JOIN ads a ON a.term = t.term
+     LEFT JOIN gsc g ON g.term = t.term
+     LEFT JOIN fact_term_classification cl ON cl.account_id = ? AND cl.term = t.term
+     ORDER BY (COALESCE(a.clicks,0) + COALESCE(g.clicks,0)) DESC
+     LIMIT 500`,
+    binds,
+  );
+
+  const data = rows.map((r: any) => ({
+    term: r.term ?? "(consulta anônima)",
+    ads_clicks: r.ads_clicks ?? 0,
+    ads_cost: r.ads_cost ?? 0,
+    gsc_clicks: r.gsc_clicks ?? 0,
+    classificacao_principal: r.classificacao_principal ?? null,
+    etiquetas: r.etiquetas ?? null,
+    intencao_busca: r.intencao_busca ?? null,
+    etapa_funil: r.etapa_funil ?? null,
+    temperatura: r.temperatura ?? null,
+    relevancia: r.relevancia ?? null,
+    adequacao_publico: r.adequacao_publico ?? null,
+    localidade: r.localidade ?? null,
+    relacionamento_marca: r.relacionamento_marca ?? null,
+    potencial_conversao: r.potencial_conversao ?? null,
+    origem_dados: r.origem_dados ?? null,
+    cobertura_atual: r.cobertura_atual ?? null,
+    acao_recomendada: r.acao_recomendada ?? null,
+    classified: r.updated_at != null,
+  }));
+  return c.json({ account, range: { from, to }, rows: data });
+});
+
 reports.get("/freshness", async (c) => {
   const acc = c.req.query("account");
   const rows = acc
