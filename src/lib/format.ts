@@ -15,6 +15,10 @@ export const pct = (n: number | null | undefined, d = 1) =>
 export const pctFrac = (n: number | null | undefined, d = 1) =>
   n == null ? "—" : pct(n * 100, d);
 
+/** Soma um campo numérico de uma lista de linhas — usado nas colunas somáveis do DataTable. */
+export const sumBy = <T,>(rows: T[], key: keyof T): number =>
+  rows.reduce((acc, r) => acc + (Number(r[key]) || 0), 0);
+
 export const shortDate = (d: string) =>
   new Date(d + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 

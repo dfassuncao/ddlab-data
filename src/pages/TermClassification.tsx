@@ -4,7 +4,7 @@ import { api } from "../lib/api";
 import { usePage } from "../lib/usePage";
 import { PageHeader, QueryState } from "../components/PageHeader";
 import { DataTable, type Column } from "../components/DataTable";
-import { brl, int } from "../lib/format";
+import { brl, int, sumBy } from "../lib/format";
 
 type ClassificationRow = {
   term: string;
@@ -30,9 +30,27 @@ type ClassificationRow = {
 const COLUMNS: Column<ClassificationRow>[] = [
   { key: "term", header: "Termo", render: (r) => r.term },
   { key: "origem_dados", header: "Origem", render: (r) => r.origem_dados ?? "—" },
-  { key: "ads_clicks", header: "Cliques (Ads)", align: "right", render: (r) => int(r.ads_clicks) },
-  { key: "ads_cost", header: "Custo (Ads)", align: "right", render: (r) => brl(r.ads_cost) },
-  { key: "gsc_clicks", header: "Cliques (GSC)", align: "right", render: (r) => int(r.gsc_clicks) },
+  {
+    key: "ads_clicks",
+    header: "Cliques (Ads)",
+    align: "right",
+    render: (r) => int(r.ads_clicks),
+    total: (rows) => int(sumBy(rows, "ads_clicks")),
+  },
+  {
+    key: "ads_cost",
+    header: "Custo (Ads)",
+    align: "right",
+    render: (r) => brl(r.ads_cost),
+    total: (rows) => brl(sumBy(rows, "ads_cost")),
+  },
+  {
+    key: "gsc_clicks",
+    header: "Cliques (GSC)",
+    align: "right",
+    render: (r) => int(r.gsc_clicks),
+    total: (rows) => int(sumBy(rows, "gsc_clicks")),
+  },
   {
     key: "classificacao_principal",
     header: "Classificação principal",

@@ -4,7 +4,7 @@ import { api } from "../lib/api";
 import { usePage } from "../lib/usePage";
 import { PageHeader, QueryState } from "../components/PageHeader";
 import { DataTable, type Column } from "../components/DataTable";
-import { brl, int, pct, dec } from "../lib/format";
+import { brl, int, pct, dec, sumBy } from "../lib/format";
 
 type GscRow = { label: string; clicks: number; impressions: number; ctr: number; position: number | null };
 
@@ -32,8 +32,20 @@ const TABS: { kind: Tab; label: string }[] = [
 
 const GSC_COLUMNS = (itemLabel: string): Column<GscRow>[] => [
   { key: "label", header: itemLabel, render: (r) => r.label },
-  { key: "clicks", header: "Cliques", align: "right", render: (r) => int(r.clicks) },
-  { key: "impressions", header: "Impr.", align: "right", render: (r) => int(r.impressions) },
+  {
+    key: "clicks",
+    header: "Cliques",
+    align: "right",
+    render: (r) => int(r.clicks),
+    total: (rows) => int(sumBy(rows, "clicks")),
+  },
+  {
+    key: "impressions",
+    header: "Impr.",
+    align: "right",
+    render: (r) => int(r.impressions),
+    total: (rows) => int(sumBy(rows, "impressions")),
+  },
   { key: "ctr", header: "CTR", align: "right", render: (r) => pct(r.ctr) },
   {
     key: "position",
@@ -46,13 +58,49 @@ const GSC_COLUMNS = (itemLabel: string): Column<GscRow>[] => [
 
 const CRUZAMENTO_COLUMNS = (currency: string): Column<CruzamentoRow>[] => [
   { key: "label", header: "Termo de busca", render: (r) => r.label },
-  { key: "ads_impressions", header: "Impr. (Ads)", align: "right", render: (r) => int(r.ads_impressions) },
-  { key: "ads_clicks", header: "Cliques (Ads)", align: "right", render: (r) => int(r.ads_clicks) },
+  {
+    key: "ads_impressions",
+    header: "Impr. (Ads)",
+    align: "right",
+    render: (r) => int(r.ads_impressions),
+    total: (rows) => int(sumBy(rows, "ads_impressions")),
+  },
+  {
+    key: "ads_clicks",
+    header: "Cliques (Ads)",
+    align: "right",
+    render: (r) => int(r.ads_clicks),
+    total: (rows) => int(sumBy(rows, "ads_clicks")),
+  },
   { key: "ads_ctr", header: "CTR (Ads)", align: "right", render: (r) => (r.ads_ctr == null ? "—" : pct(r.ads_ctr)) },
-  { key: "ads_cost", header: "Custo (Ads)", align: "right", render: (r) => brl(r.ads_cost, currency) },
-  { key: "ads_conversions", header: "Conversões (Ads)", align: "right", render: (r) => dec(r.ads_conversions, 1) },
-  { key: "gsc_impressions", header: "Impr. (GSC)", align: "right", render: (r) => int(r.gsc_impressions) },
-  { key: "gsc_clicks", header: "Cliques (GSC)", align: "right", render: (r) => int(r.gsc_clicks) },
+  {
+    key: "ads_cost",
+    header: "Custo (Ads)",
+    align: "right",
+    render: (r) => brl(r.ads_cost, currency),
+    total: (rows) => brl(sumBy(rows, "ads_cost"), currency),
+  },
+  {
+    key: "ads_conversions",
+    header: "Conversões (Ads)",
+    align: "right",
+    render: (r) => dec(r.ads_conversions, 1),
+    total: (rows) => dec(sumBy(rows, "ads_conversions"), 1),
+  },
+  {
+    key: "gsc_impressions",
+    header: "Impr. (GSC)",
+    align: "right",
+    render: (r) => int(r.gsc_impressions),
+    total: (rows) => int(sumBy(rows, "gsc_impressions")),
+  },
+  {
+    key: "gsc_clicks",
+    header: "Cliques (GSC)",
+    align: "right",
+    render: (r) => int(r.gsc_clicks),
+    total: (rows) => int(sumBy(rows, "gsc_clicks")),
+  },
   { key: "gsc_ctr", header: "CTR (GSC)", align: "right", render: (r) => (r.gsc_ctr == null ? "—" : pct(r.gsc_ctr)) },
   {
     key: "gsc_position",

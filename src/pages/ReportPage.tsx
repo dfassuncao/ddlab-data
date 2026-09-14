@@ -4,7 +4,7 @@ import { usePage } from "../lib/usePage";
 import { PageHeader, QueryState } from "../components/PageHeader";
 import { DataTable, type Column } from "../components/DataTable";
 import { metricCols, qualityCol } from "../lib/columns";
-import { brl, int, pct } from "../lib/format";
+import { brl, int, pct, sumBy } from "../lib/format";
 import { downloadCsv } from "../lib/csv";
 
 type Row = Record<string, any>;
@@ -36,10 +36,28 @@ const EXTRA: Record<string, Column<Row>[]> = {
 
 // landing-pages: o transfer não traz conversão nessa tabela — só tráfego + velocidade.
 const LP_COLS: Column<Row>[] = [
-  { key: "impressions", header: "Impr.", align: "right", render: (r) => int(r.impressions) },
-  { key: "clicks", header: "Cliques", align: "right", render: (r) => int(r.clicks) },
+  {
+    key: "impressions",
+    header: "Impr.",
+    align: "right",
+    render: (r) => int(r.impressions),
+    total: (rows) => int(sumBy(rows, "impressions")),
+  },
+  {
+    key: "clicks",
+    header: "Cliques",
+    align: "right",
+    render: (r) => int(r.clicks),
+    total: (rows) => int(sumBy(rows, "clicks")),
+  },
   { key: "ctr", header: "CTR", align: "right", render: (r) => pct(r.ctr) },
-  { key: "cost", header: "Custo", align: "right", render: (r) => brl(r.cost) },
+  {
+    key: "cost",
+    header: "Custo",
+    align: "right",
+    render: (r) => brl(r.cost),
+    total: (rows) => brl(sumBy(rows, "cost")),
+  },
   { key: "cpc", header: "CPC", align: "right", render: (r) => brl(r.cpc) },
   {
     key: "mobile_speed",
