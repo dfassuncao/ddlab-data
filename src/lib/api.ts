@@ -1,25 +1,39 @@
 import type { Account } from "@shared/types";
 
-async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`/api${path}`, { headers: { Accept: "application/json" } });
-  if (res.status === 401) {
-    // Sessão do Cloudflare Access expirou — recarrega para reautenticar.
-    window.location.reload();
-    throw new Error("401");
+// Sessão do Cloudflare Access expirou — recarrega para reautenticar. Uma
+// navegação de página cheia não tem bloqueio de CORS (diferente de um
+// fetch/XHR), então o redirect do Access para a tela de login funciona.
+function reauth(): never {
+  window.location.reload();
+  throw new Error("sessão expirada, recarregando…");
+}
+
+async function handle<T>(req: Promise<Response>): Promise<T> {
+  let res: Response;
+  try {
+    res = await req;
+  } catch {
+    // fetch() falha (TypeError) quando o navegador bloqueia por CORS a
+    // resposta redirecionada para o domínio de login do Access — status
+    // sequer fica acessível, então isso também conta como sessão expirada.
+    reauth();
   }
+  if (res.status === 401) reauth();
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
   return res.json() as Promise<T>;
 }
 
-async function post<T>(path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`/api${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
-  return res.json() as Promise<T>;
-}
+const get = <T>(path: string) =>
+  handle<T>(fetch(`/api${path}`, { headers: { Accept: "application/json" } }));
+
+const post = <T>(path: string, body?: unknown) =>
+  handle<T>(
+    fetch(`/api${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+    }),
+  );
 
 export interface RangeQuery {
   account: string;
