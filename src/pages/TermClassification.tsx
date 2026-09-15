@@ -44,6 +44,18 @@ const LEGENDA = [
   { cor: "bg-blue-400", label: "Ambos", origem: "Google Ads e Search Console" },
 ];
 
+// Origem calculada ao vivo a partir dos cliques do período selecionado — não
+// usa o campo origem_dados (congelado na janela fixa usada na classificação
+// por IA), que diverge do período exibido e gerava cor/filtro inconsistentes.
+function origemAoVivo(r: ClassificationRow): string | null {
+  const temAds = r.ads_clicks > 0;
+  const temGsc = r.gsc_clicks > 0;
+  if (temAds && temGsc) return "Google Ads e Search Console";
+  if (temAds) return "Google Ads";
+  if (temGsc) return "Search Console";
+  return null;
+}
+
 const COLUMNS: Column<ClassificationRow>[] = [
   { key: "term", header: "Termo", className: "whitespace-nowrap", render: (r) => r.term },
   {
@@ -136,7 +148,7 @@ export function TermClassification() {
 
   const filtered = rows.filter((r) => {
     if (filtroClassificacao && r.classificacao_principal !== filtroClassificacao) return false;
-    if (filtroOrigem && r.origem_dados !== filtroOrigem) return false;
+    if (filtroOrigem && origemAoVivo(r) !== filtroOrigem) return false;
     if (busca && !r.term.toLowerCase().includes(busca.toLowerCase())) return false;
     return true;
   });
@@ -207,7 +219,10 @@ export function TermClassification() {
             initialSort={{ key: "ads_clicks", dir: "desc" }}
             columns={COLUMNS}
             stickyFirstColumn
-            rowClassName={(r) => (r.origem_dados ? ORIGEM_ROW_BG[r.origem_dados] : undefined)}
+            rowClassName={(r) => {
+              const o = origemAoVivo(r);
+              return o ? ORIGEM_ROW_BG[o] : undefined;
+            }}
           />
         </>
       )}
