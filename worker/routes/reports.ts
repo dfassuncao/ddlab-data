@@ -512,12 +512,12 @@ reports.get("/term-classification", async (c) => {
     `WITH ads AS (
        SELECT LOWER(TRIM(search_term)) AS term, SUM(clicks) AS clicks, SUM(cost) AS cost,
          SUM(impressions) AS impressions, SUM(conversions) AS conversions
-       FROM fact_searchterm_daily WHERE account_id=? AND day>=? AND day<=? GROUP BY term
+       FROM fact_searchterm_daily WHERE account_id=? AND day>=? AND day<=? AND TRIM(search_term) != '' GROUP BY term
      ),
      gsc AS (
        SELECT LOWER(TRIM(query)) AS term, SUM(clicks) AS clicks, SUM(impressions) AS impressions,
          ROUND(AVG(position), 1) AS position
-       FROM fact_gsc_query_daily WHERE account_id=? AND day>=? AND day<=? GROUP BY term
+       FROM fact_gsc_query_daily WHERE account_id=? AND day>=? AND day<=? AND TRIM(query) != '' GROUP BY term
      ),
      terms AS (SELECT term FROM ads UNION SELECT term FROM gsc)
      SELECT t.term,
@@ -537,7 +537,7 @@ reports.get("/term-classification", async (c) => {
   );
 
   const data = rows.map((r: any) => ({
-    term: r.term ?? "(consulta anônima)",
+    term: r.term || "(consulta anônima)",
     ads_clicks: r.ads_clicks ?? 0,
     ads_cost: r.ads_cost ?? 0,
     ads_impressions: r.ads_impressions ?? 0,
