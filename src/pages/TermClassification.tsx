@@ -45,12 +45,14 @@ const LEGENDA = [
   { cor: "bg-blue-400", label: "Ambos", origem: "Google Ads e Search Console" },
 ];
 
-// Origem calculada ao vivo a partir dos cliques do período selecionado — não
-// usa o campo origem_dados (congelado na janela fixa usada na classificação
-// por IA), que diverge do período exibido e gerava cor/filtro inconsistentes.
+// Origem calculada ao vivo a partir de impressões/cliques do período
+// selecionado — não usa o campo origem_dados (congelado na janela fixa usada
+// na classificação por IA), que diverge do período exibido e gerava
+// cor/filtro inconsistentes. Considera impressões (não só cliques): um termo
+// com impressões no GSC mas 0 cliques ainda tem dado real dessa fonte.
 function origemAoVivo(r: ClassificationRow): string | null {
-  const temAds = r.ads_clicks > 0;
-  const temGsc = r.gsc_clicks > 0;
+  const temAds = r.ads_impressions > 0 || r.ads_clicks > 0;
+  const temGsc = r.gsc_impressions > 0 || r.gsc_clicks > 0;
   if (temAds && temGsc) return "Google Ads e Search Console";
   if (temAds) return "Google Ads";
   if (temGsc) return "Search Console";
