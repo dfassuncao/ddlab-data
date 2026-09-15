@@ -22,7 +22,7 @@ Aplicação de inteligência de marketing (Google Ads + GA4 + Search Console) da
 **Núcleo**: Central de decisão · Diagnóstico IA · Saúde dos dados
 **Relatórios**: Visão geral · Análise IA (texto) · Campanhas · Palavras‑chave · Termos de busca ·
 Geografia · Horário & Dispositivo · Anúncios · Públicos · Produtos · Landing pages ·
-Search Console · Desperdício · Oportunidades
+Search Console · Google Analytics · Desperdício · Oportunidades
 **Configurações**: metas por conta, briefing do cliente, datasets de GA4/GSC, backfill manual
 
 ## Rodar local
