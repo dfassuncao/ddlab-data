@@ -5,6 +5,7 @@ import { usePage } from "../lib/usePage";
 import { PageHeader, QueryState } from "../components/PageHeader";
 import { DataTable, type Column } from "../components/DataTable";
 import { brl, int, dec, sumBy } from "../lib/format";
+import { downloadCsv } from "../lib/csv";
 
 type ClassificationRow = {
   term: string;
@@ -54,6 +55,48 @@ function origemAoVivo(r: ClassificationRow): string | null {
   if (temAds) return "Google Ads";
   if (temGsc) return "Search Console";
   return null;
+}
+
+const CSV_HEADER = [
+  "Termo",
+  "Impr. (Ads)",
+  "Cliques (Ads)",
+  "Custo (Ads)",
+  "Conversões (Ads)",
+  "Impr. (GSC)",
+  "Cliques (GSC)",
+  "Posição (GSC)",
+  "Classificação principal",
+  "Intenção",
+  "Etapa do funil",
+  "Temperatura",
+  "Relevância",
+  "Potencial conversão",
+  "Ação recomendada",
+  "Etiquetas",
+];
+
+function exportCsv(rows: ClassificationRow[], accountName: string) {
+  const body = rows.map((r) => [
+    r.term,
+    r.ads_impressions,
+    r.ads_clicks,
+    r.ads_cost,
+    r.ads_conversions,
+    r.gsc_impressions,
+    r.gsc_clicks,
+    r.gsc_position ?? "",
+    r.classificacao_principal ?? "",
+    r.intencao_busca ?? "",
+    r.etapa_funil ?? "",
+    r.temperatura ?? "",
+    r.relevancia ?? "",
+    r.potencial_conversao ?? "",
+    r.acao_recomendada ?? "",
+    r.etiquetas ?? "",
+  ]);
+  const slug = accountName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  downloadCsv(`classificacao-termos-${slug}-${new Date().toISOString().slice(0, 10)}.csv`, CSV_HEADER, body);
 }
 
 const COLUMNS: Column<ClassificationRow>[] = [
@@ -196,6 +239,12 @@ export function TermClassification() {
               {filtered.length} de {rows.length} termos
               {semClassificacao > 0 ? ` · ${semClassificacao} ainda sem classificação` : ""}
             </p>
+            <button
+              onClick={() => exportCsv(filtered, account?.name ?? "conta")}
+              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-50"
+            >
+              Exportar CSV
+            </button>
             <div className="ml-auto flex items-center gap-3 text-xs text-slate-500">
               {LEGENDA.map((l) => (
                 <button
