@@ -43,6 +43,7 @@ function ga4Sql(env: Env, dataset: string, keyEvents: string[], startYmd: string
         LOWER(MAX(COALESCE(collected_traffic_source.manual_source, traffic_source.source))) AS src,
         LOWER(MAX(COALESCE(collected_traffic_source.manual_medium, traffic_source.medium))) AS med,
         COUNTIF(${keyExpr}) AS key_events,
+        COUNTIF(event_name = 'page_view') AS page_views,
         SUM(CASE WHEN event_name = 'purchase'
                  THEN COALESCE(ecommerce.purchase_revenue,
                                (SELECT value.double_value FROM UNNEST(event_params) WHERE key = 'value'))
@@ -68,6 +69,7 @@ function ga4Sql(env: Env, dataset: string, keyEvents: string[], startYmd: string
       COUNTIF(engaged = '1') AS engaged_sessions,
       COUNT(DISTINCT user_pseudo_id) AS active_users,
       SUM(key_events) AS key_events,
+      SUM(page_views) AS page_views,
       SUM(IFNULL(revenue, 0)) AS revenue
     FROM s
     GROUP BY day, channel`;
@@ -118,6 +120,7 @@ export async function runGa4(
     engaged_sessions: num(r.engaged_sessions),
     active_users: num(r.active_users),
     key_events: num(r.key_events),
+    page_views: num(r.page_views),
     revenue: num(r.revenue),
   }));
 
@@ -127,7 +130,17 @@ export async function runGa4(
   await bulkInsert(
     env,
     "fact_ga4_daily",
-    ["account_id", "day", "channel", "sessions", "engaged_sessions", "active_users", "key_events", "revenue"],
+    [
+      "account_id",
+      "day",
+      "channel",
+      "sessions",
+      "engaged_sessions",
+      "active_users",
+      "key_events",
+      "page_views",
+      "revenue",
+    ],
     rows,
   );
 

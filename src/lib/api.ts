@@ -42,6 +42,7 @@ export const api = {
   opportunities: (q: RangeQuery) => get<any>(`/opportunities${qs(q)}`),
   freshness: (account?: string) => get<any>(`/freshness${account ? `?account=${account}` : ""}`),
   gsc: (kind: "queries" | "pages", q: RangeQuery) => get<any>(`/gsc/${kind}${qs(q)}`),
+  ga4: (q: RangeQuery) => get<any>(`/ga4${qs(q)}`),
   cruzamento: (q: RangeQuery) => get<any>(`/cruzamento${qs(q)}`),
   termClassification: (q: RangeQuery) => get<any>(`/term-classification${qs(q)}`),
   refresh: (account?: string, days?: number) =>

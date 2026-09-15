@@ -446,6 +446,40 @@ reports.get("/gsc/:kind", async (c) => {
   return c.json({ account, range: { from, to }, rows: data });
 });
 
+// Métricas de site do GA4 (usuários, sessões, pageviews, leads/key events,
+// taxa de rejeição), por canal de aquisição.
+reports.get("/ga4", async (c) => {
+  const { account, error } = await accountOr404(c);
+  if (error) return error;
+  const { from, to } = resolveRange(c.req.query("from"), c.req.query("to"));
+
+  const rows = await q(
+    c.env,
+    `SELECT channel,
+       SUM(sessions) AS sessions,
+       SUM(engaged_sessions) AS engaged_sessions,
+       SUM(active_users) AS active_users,
+       SUM(key_events) AS key_events,
+       SUM(page_views) AS page_views,
+       SUM(revenue) AS revenue
+     FROM fact_ga4_daily
+     WHERE account_id = ? AND day >= ? AND day <= ?
+     GROUP BY channel
+     ORDER BY sessions DESC`,
+    [account!.id, from, to],
+  );
+  const data = rows.map((r: any) => ({
+    channel: r.channel,
+    sessions: r.sessions ?? 0,
+    active_users: r.active_users ?? 0,
+    page_views: r.page_views ?? 0,
+    key_events: r.key_events ?? 0,
+    bounce_rate: r.sessions > 0 ? round((1 - r.engaged_sessions / r.sessions) * 100, 2) : null,
+    revenue: r.revenue ?? 0,
+  }));
+  return c.json({ account, range: { from, to }, rows: data });
+});
+
 // Cruza termos de busca do Ads (o que o usuário literalmente digitou, não a
 // palavra-chave configurada) com as consultas orgânicas do Search Console —
 // mesma dimensão (texto da busca) nas duas fontes.
