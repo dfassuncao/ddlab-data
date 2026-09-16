@@ -27,6 +27,7 @@ const RELATORIOS = [
   { to: "/relatorios/classificacao-termos", label: "Classificação de termos" },
   { to: "/relatorios/waste", label: "Desperdício" },
   { to: "/relatorios/opportunities", label: "Oportunidades" },
+  { to: "/relatorios/apresentacao", label: "Apresentação" },
 ];
 
 function Section({
