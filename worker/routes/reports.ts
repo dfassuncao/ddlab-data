@@ -480,6 +480,125 @@ reports.get("/ga4", async (c) => {
   return c.json({ account, range: { from, to }, rows: data });
 });
 
+// Pacote de dados para a Apresentação (Relatórios → Apresentação): junta
+// Ads + GSC + GA4 do período (e do período comparativo anterior, se pedido)
+// num único JSON, para servir de insumo à geração do PPTX/PDF fora do app.
+async function ga4Resumo(env: Env, accountId: string, from: string, to: string) {
+  const row = (
+    await q<any>(
+      env,
+      `SELECT SUM(sessions) AS sessions, SUM(engaged_sessions) AS engaged_sessions,
+         SUM(active_users) AS active_users, SUM(key_events) AS key_events,
+         SUM(page_views) AS page_views
+       FROM fact_ga4_daily WHERE account_id = ? AND day >= ? AND day <= ?`,
+      [accountId, from, to],
+    )
+  )[0];
+  const sessions = row?.sessions ?? 0;
+  return {
+    sessions,
+    active_users: row?.active_users ?? 0,
+    page_views: row?.page_views ?? 0,
+    key_events: row?.key_events ?? 0,
+    bounce_rate: sessions > 0 ? round((1 - (row.engaged_sessions ?? 0) / sessions) * 100, 2) : null,
+  };
+}
+
+async function gscResumo(env: Env, accountId: string, from: string, to: string) {
+  const row = (
+    await q<any>(
+      env,
+      `SELECT SUM(clicks) AS clicks, SUM(impressions) AS impressions, ROUND(AVG(position), 1) AS position
+       FROM fact_gsc_query_daily WHERE account_id = ? AND day >= ? AND day <= ?`,
+      [accountId, from, to],
+    )
+  )[0];
+  const clicks = row?.clicks ?? 0;
+  const impressions = row?.impressions ?? 0;
+  return {
+    clicks,
+    impressions,
+    ctr: impressions > 0 ? round((clicks / impressions) * 100, 2) : 0,
+    position: row?.position ?? null,
+  };
+}
+
+reports.get("/presentation-data", async (c) => {
+  const { account, error } = await accountOr404(c);
+  if (error) return error;
+  const { from, to } = resolveRange(c.req.query("from"), c.req.query("to"));
+  const comparar = c.req.query("comparar") === "1";
+  const prev = comparar ? previousRange(from, to) : null;
+
+  const [adsAtualRaw, adsCampanhas, gscAtual, gscConsultas, ga4Atual, ga4PorCanal] = await Promise.all([
+    q<any>(c.env, `SELECT ${METRIC_SUM} FROM fact_campaign_daily WHERE account_id=? AND day>=? AND day<=?`, [
+      account!.id,
+      from,
+      to,
+    ]),
+    q<any>(
+      c.env,
+      `SELECT COALESCE(d.name, fc.campaign_id) AS campanha, ${METRIC_SUM}
+       FROM fact_campaign_daily fc
+       LEFT JOIN dim_campaign d ON d.account_id = fc.account_id AND d.campaign_id = fc.campaign_id
+       WHERE fc.account_id=? AND fc.day>=? AND fc.day<=?
+       GROUP BY fc.campaign_id ORDER BY cost DESC LIMIT 10`,
+      [account!.id, from, to],
+    ),
+    gscResumo(c.env, account!.id, from, to),
+    q<any>(
+      c.env,
+      `SELECT query, SUM(clicks) AS clicks, SUM(impressions) AS impressions, ROUND(AVG(position), 1) AS position
+       FROM fact_gsc_query_daily
+       WHERE account_id=? AND day>=? AND day<=? AND TRIM(query) != ''
+       GROUP BY query ORDER BY clicks DESC LIMIT 15`,
+      [account!.id, from, to],
+    ),
+    ga4Resumo(c.env, account!.id, from, to),
+    q<any>(
+      c.env,
+      `SELECT channel, SUM(sessions) AS sessions, SUM(engaged_sessions) AS engaged_sessions,
+         SUM(active_users) AS active_users, SUM(key_events) AS key_events, SUM(page_views) AS page_views
+       FROM fact_ga4_daily WHERE account_id=? AND day>=? AND day<=? GROUP BY channel ORDER BY sessions DESC`,
+      [account!.id, from, to],
+    ),
+  ]);
+
+  let comparativo: { ads: ReturnType<typeof withKpis>; gsc: any; ga4: any } | null = null;
+  if (prev) {
+    const [adsPrevRaw, gscPrev, ga4Prev] = await Promise.all([
+      q<any>(c.env, `SELECT ${METRIC_SUM} FROM fact_campaign_daily WHERE account_id=? AND day>=? AND day<=?`, [
+        account!.id,
+        prev.from,
+        prev.to,
+      ]),
+      gscResumo(c.env, account!.id, prev.from, prev.to),
+      ga4Resumo(c.env, account!.id, prev.from, prev.to),
+    ]);
+    comparativo = { ads: withKpis(adsPrevRaw[0] ?? {}), gsc: gscPrev, ga4: ga4Prev };
+  }
+
+  return c.json({
+    cliente: account!.name,
+    periodo: { from, to },
+    periodo_comparativo: prev,
+    moeda: account!.currency,
+    ads: { atual: withKpis(adsAtualRaw[0] ?? {}), comparativo: comparativo?.ads ?? null, campanhas: adsCampanhas },
+    gsc: {
+      conectado: !!account!.gsc_dataset,
+      atual: gscAtual,
+      comparativo: comparativo?.gsc ?? null,
+      top_consultas: gscConsultas,
+    },
+    ga4: {
+      conectado: !!account!.ga4_dataset,
+      atual: ga4Atual,
+      comparativo: comparativo?.ga4 ?? null,
+      por_canal: ga4PorCanal,
+    },
+  });
+});
+
 // Cruza termos de busca do Ads (o que o usuário literalmente digitou, não a
 // palavra-chave configurada) com as consultas orgânicas do Search Console —
 // mesma dimensão (texto da busca) nas duas fontes.

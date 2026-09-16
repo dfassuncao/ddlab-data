@@ -8,6 +8,7 @@ import { AiAnalysis } from "./pages/AiAnalysis";
 import { ReportPage } from "./pages/ReportPage";
 import { SearchConsole } from "./pages/SearchConsole";
 import { GoogleAnalytics } from "./pages/GoogleAnalytics";
+import { Apresentacao } from "./pages/Apresentacao";
 import { TermClassification } from "./pages/TermClassification";
 import { Schedule } from "./pages/Schedule";
 import { Waste } from "./pages/Waste";
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="/relatorios/classificacao-termos" element={<TermClassification />} />
         <Route path="/relatorios/waste" element={<Waste />} />
         <Route path="/relatorios/opportunities" element={<Opportunities />} />
+        <Route path="/relatorios/apresentacao" element={<Apresentacao />} />
 
         <Route path="/configuracoes" element={<Settings />} />
 
