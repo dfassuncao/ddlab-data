@@ -59,6 +59,18 @@ function origemAoVivo(r: ClassificationRow): string | null {
   return null;
 }
 
+// Colunas de classificação com filtro dedicado (opções geradas a partir dos
+// valores realmente presentes nos termos retornados, não de uma lista fixa).
+const FILTER_FIELDS: { key: keyof ClassificationRow; label: string }[] = [
+  { key: "classificacao_principal", label: "Classificação" },
+  { key: "intencao_busca", label: "Intenção" },
+  { key: "etapa_funil", label: "Etapa do funil" },
+  { key: "temperatura", label: "Temperatura" },
+  { key: "relevancia", label: "Relevância" },
+  { key: "potencial_conversao", label: "Potencial conversão" },
+  { key: "acao_recomendada", label: "Ação recomendada" },
+];
+
 const CSV_HEADER = [
   "Termo",
   "Impr. (Ads)",
@@ -173,7 +185,7 @@ const COLUMNS: Column<ClassificationRow>[] = [
 
 export function TermClassification() {
   const { accounts, account, f } = usePage();
-  const [filtroClassificacao, setFiltroClassificacao] = useState("");
+  const [filtros, setFiltros] = useState<Record<string, string>>({});
   const [filtroOrigem, setFiltroOrigem] = useState("");
   const [busca, setBusca] = useState("");
 
@@ -185,14 +197,21 @@ export function TermClassification() {
 
   const rows: ClassificationRow[] = q.data?.rows ?? [];
 
-  const classificacoes = useMemo(
-    () =>
-      [...new Set(rows.map((r) => r.classificacao_principal).filter(Boolean))].sort() as string[],
-    [rows],
-  );
+  const optionsByField = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const f of FILTER_FIELDS) {
+      map[f.key] = [...new Set(rows.map((r) => r[f.key]).filter(Boolean))].sort() as string[];
+    }
+    return map;
+  }, [rows]);
+
+  const filtrosAtivos = Object.values(filtros).filter(Boolean).length + (filtroOrigem ? 1 : 0);
 
   const filtered = rows.filter((r) => {
-    if (filtroClassificacao && r.classificacao_principal !== filtroClassificacao) return false;
+    for (const f of FILTER_FIELDS) {
+      const v = filtros[f.key];
+      if (v && r[f.key] !== v) return false;
+    }
     if (filtroOrigem && origemAoVivo(r) !== filtroOrigem) return false;
     if (busca && !r.term.toLowerCase().includes(busca.toLowerCase())) return false;
     return true;
@@ -225,18 +244,32 @@ export function TermClassification() {
               placeholder="Buscar termo…"
               className="rounded-md border border-slate-300 px-3 py-1.5 text-sm"
             />
-            <select
-              value={filtroClassificacao}
-              onChange={(e) => setFiltroClassificacao(e.target.value)}
-              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-            >
-              <option value="">Todas as classificações</option>
-              {classificacoes.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+            {FILTER_FIELDS.map((f) => (
+              <select
+                key={f.key}
+                value={filtros[f.key] ?? ""}
+                onChange={(e) => setFiltros((s) => ({ ...s, [f.key]: e.target.value }))}
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+              >
+                <option value="">{f.label} (todas)</option>
+                {optionsByField[f.key]?.map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+            ))}
+            {filtrosAtivos > 0 && (
+              <button
+                onClick={() => {
+                  setFiltros({});
+                  setFiltroOrigem("");
+                }}
+                className="text-xs text-slate-400 underline hover:text-slate-600"
+              >
+                Limpar filtros
+              </button>
+            )}
             <p className="text-xs text-slate-400">
               {filtered.length} de {rows.length} termos
               {semClassificacao > 0 ? ` · ${semClassificacao} ainda sem classificação` : ""}
