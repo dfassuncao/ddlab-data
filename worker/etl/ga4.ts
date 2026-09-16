@@ -9,16 +9,20 @@ const yyyymmdd = (d: Date) => d.toISOString().slice(0, 10).replace(/-/g, "");
 function keyEventExpr(keyEvents: string[]): string {
   const list = keyEvents.filter(safeIdent);
   if (list.length) {
-    return `event_name IN (${list.map((e) => `'${e}'`).join(", ")})`;
+    return `LOWER(event_name) IN (${list.map((e) => `'${e.toLowerCase()}'`).join(", ")})`;
   }
   // Sem lista configurada: heurística que cobre os padrões de nome mais comuns.
+  // LOWER() dos dois lados é necessário — o BigQuery faz LIKE case-sensitive por
+  // padrão, e muitas contas usam eventos customizados com prefixo e capitalização
+  // própria (ex.: "[DDLab] - Lead WPP", "[Agência] - Lead Telefone - ...").
   return `(
-    event_name IN ('generate_lead','purchase','contact','form_submit','submit_lead_form',
+    LOWER(event_name) IN ('generate_lead','purchase','contact','form_submit','submit_lead_form',
                    'phone_call','begin_checkout','sign_up','subscribe','schedule')
-    OR event_name LIKE 'lead%'
-    OR event_name LIKE '%_lead%'
-    OR event_name LIKE '%whatsapp%'
-    OR event_name LIKE '%form%'
+    OR LOWER(event_name) LIKE '%lead%'
+    OR LOWER(event_name) LIKE '%whatsapp%'
+    OR LOWER(event_name) LIKE '%form%'
+    OR LOWER(event_name) LIKE '%telefone%'
+    OR LOWER(event_name) LIKE '%phone%'
   )`;
 }
 
