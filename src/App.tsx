@@ -9,6 +9,7 @@ import { ReportPage } from "./pages/ReportPage";
 import { SearchConsole } from "./pages/SearchConsole";
 import { GoogleAnalytics } from "./pages/GoogleAnalytics";
 import { Apresentacao } from "./pages/Apresentacao";
+import { AdsActions } from "./pages/AdsActions";
 import { TermClassification } from "./pages/TermClassification";
 import { Schedule } from "./pages/Schedule";
 import { Waste } from "./pages/Waste";
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="/" element={<DecisionCenter />} />
         <Route path="/diagnostico" element={<Diagnostico />} />
         <Route path="/saude-dados" element={<DataHealth />} />
+        <Route path="/acoes-pendentes" element={<AdsActions />} />
 
         {/* Relatórios (Google Ads) */}
         <Route path="/relatorios/visao-geral" element={<Overview />} />
