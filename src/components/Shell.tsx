@@ -8,6 +8,7 @@ const NUCLEO = [
   { to: "/", label: "Central de decisão", end: true },
   { to: "/diagnostico", label: "Diagnóstico IA" },
   { to: "/saude-dados", label: "Saúde dos dados" },
+  { to: "/acoes-pendentes", label: "Ações pendentes" },
 ];
 
 const RELATORIOS = [

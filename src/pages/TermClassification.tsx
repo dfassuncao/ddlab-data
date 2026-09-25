@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { usePage } from "../lib/usePage";
 import { PageHeader, QueryState } from "../components/PageHeader";
@@ -188,6 +188,13 @@ export function TermClassification() {
   const [filtros, setFiltros] = useState<Record<string, string>>({});
   const [filtroOrigem, setFiltroOrigem] = useState("");
   const [busca, setBusca] = useState("");
+  const [propostos, setPropostos] = useState<Record<string, "ok" | string>>({});
+
+  const propor = useMutation({
+    mutationFn: (term: string) => api.proposeNegative({ account: f.account, term, from: f.from, to: f.to }),
+    onSuccess: (_data, term) => setPropostos((s) => ({ ...s, [term]: "ok" })),
+    onError: (err: Error, term) => setPropostos((s) => ({ ...s, [term]: err.message })),
+  });
 
   const q = useQuery({
     queryKey: ["term-classification", f.account, f.from, f.to],
@@ -218,6 +225,30 @@ export function TermClassification() {
   });
 
   const semClassificacao = rows.filter((r) => !r.classified).length;
+
+  const columnsComAcao: Column<ClassificationRow>[] = [
+    ...COLUMNS,
+    {
+      key: "negativar_action",
+      header: "Negativar",
+      className: "whitespace-nowrap",
+      render: (r) => {
+        if (r.acao_recomendada !== "Negativar" || (r.ads_clicks <= 0 && r.ads_impressions <= 0)) return "—";
+        const status = propostos[r.term];
+        if (status === "ok") return <span className="text-xs text-emerald-600">Enviado p/ aprovação</span>;
+        if (status) return <span className="text-xs text-rose-600" title={status}>Erro</span>;
+        return (
+          <button
+            onClick={() => propor.mutate(r.term)}
+            disabled={propor.isPending}
+            className="rounded border border-slate-300 bg-white px-2 py-0.5 text-xs hover:bg-slate-50 disabled:opacity-50"
+          >
+            Propor negativação
+          </button>
+        );
+      },
+    },
+  ];
 
   return (
     <div className="space-y-5">
@@ -301,7 +332,7 @@ export function TermClassification() {
             rows={filtered}
             rowKey={(r) => r.term}
             initialSort={{ key: "ads_clicks", dir: "desc" }}
-            columns={COLUMNS}
+            columns={columnsComAcao}
             stickyFirstColumn
             rowClassName={(r) => {
               const o = origemAoVivo(r);

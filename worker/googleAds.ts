@@ -99,3 +99,47 @@ export async function fetchKeywordVolumes(
   }
   return out;
 }
+
+export interface NegativeKeywordOp {
+  campaignId: string;
+  keyword: string;
+  matchType: "BROAD" | "PHRASE" | "EXACT";
+}
+
+/**
+ * Adiciona palavras-chave negativas de campanha — única mutação da fase 1 da
+ * integração de escrita com o Google Ads. Só é chamada depois que uma
+ * google_ads_actions pendente é aprovada manualmente (worker/routes/adsActions.ts).
+ */
+export async function addCampaignNegativeKeywords(
+  env: Env,
+  customerId: string,
+  ops: NegativeKeywordOp[],
+): Promise<void> {
+  if (!env.GOOGLE_ADS_DEVELOPER_TOKEN || !env.GOOGLE_ADS_CLIENT_ID || !env.GOOGLE_ADS_CLIENT_SECRET || !env.GOOGLE_ADS_REFRESH_TOKEN) {
+    throw new Error("Google Ads API não configurada");
+  }
+  const token = await getGoogleAdsAccessToken(env);
+  const res = await fetch(`https://googleads.googleapis.com/${API_VERSION}/customers/${customerId}/campaignCriteria:mutate`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "developer-token": env.GOOGLE_ADS_DEVELOPER_TOKEN,
+      "login-customer-id": env.GOOGLE_ADS_LOGIN_CUSTOMER_ID ?? env.BQ_MCC_SUFFIX,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      operations: ops.map((op) => ({
+        create: {
+          campaign: `customers/${customerId}/campaigns/${op.campaignId}`,
+          negative: true,
+          keyword: { text: op.keyword, matchType: op.matchType },
+        },
+      })),
+    }),
+  });
+  const json = (await res.json()) as any;
+  if (!res.ok) {
+    throw new Error(`Google Ads API ${res.status}: ${JSON.stringify(json.error ?? json)}`);
+  }
+}

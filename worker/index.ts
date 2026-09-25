@@ -4,6 +4,7 @@ import { accessMiddleware, type AccessUser } from "./auth";
 import { reports } from "./routes/reports";
 import { analysis } from "./routes/analysis";
 import { decision } from "./routes/decision";
+import { adsActions } from "./routes/adsActions";
 import { runEtl } from "./etl/run";
 import { runQuery } from "./bq";
 
@@ -65,6 +66,7 @@ app.post("/api/refresh", async (c) => {
 app.route("/api", reports);
 app.route("/api", analysis);
 app.route("/api", decision);
+app.route("/api", adsActions);
 
 // SPA / assets estáticos.
 app.all("*", (c) => c.env.ASSETS.fetch(c.req.raw));

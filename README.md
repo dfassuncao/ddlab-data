@@ -19,7 +19,7 @@ Aplicação de inteligência de marketing (Google Ads + GA4 + Search Console) da
 
 ## Páginas
 
-**Núcleo**: Central de decisão · Diagnóstico IA · Saúde dos dados
+**Núcleo**: Central de decisão · Diagnóstico IA · Saúde dos dados · Ações pendentes
 **Relatórios**: Visão geral · Análise IA (texto) · Campanhas · Palavras‑chave · Termos de busca ·
 Geografia · Horário & Dispositivo · Anúncios · Públicos · Produtos · Landing pages ·
 Search Console · Google Analytics · Desperdício · Oportunidades · Apresentação
@@ -97,3 +97,25 @@ mês a mês. `keyword_volume` requer as 5 vars `GOOGLE_ADS_*` (ver DEPLOY.md);
 (GSC) da conta no período, sem limite — requer `GEMINI_API_KEY` (padrão),
 `ANTHROPIC_API_KEY` (Claude) ou `DEEPSEEK_API_KEY` (DeepSeek), conforme o
 campo "IA" da conta em Configurações.
+
+## Integração de escrita com o Google Ads (Ações pendentes)
+
+Fase 1: negativar termos de busca. Nenhuma mutação é enviada para a API do
+Ads sem aprovação manual — fluxo:
+
+1. Em **Classificação de termos**, cada termo com `acao_recomendada = "Negativar"`
+   ganha um botão "Propor negativação" → cria uma linha `pending` em
+   `google_ads_actions` (`POST /api/ads-actions/propose-negative`), achando
+   automaticamente em quais campanhas o termo apareceu no período.
+2. Em **Ações pendentes**, a proposta aparece em texto claro (termo,
+   correspondência, campanhas afetadas). Só ali é possível Aprovar/Rejeitar.
+3. Aprovar chama `worker/googleAds.ts#addCampaignNegativeKeywords`
+   (`campaignCriteria:mutate` da Google Ads API) e grava o resultado real —
+   `applied` ou `error` (nunca fica "meio aplicada": só muda de status depois
+   da resposta da API).
+
+Usa as mesmas credenciais `GOOGLE_ADS_*` já configuradas para o
+`keyword_volume` (mesmo escopo OAuth `adwords`, que cobre leitura e escrita
+na API do Ads — não precisa de token/escopo novo). Próximas fases:
+pausar/reativar campanhas e palavras-chave, ajuste de orçamento/lances,
+criação de campanhas/anúncios.

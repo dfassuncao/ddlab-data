@@ -79,4 +79,15 @@ export const api = {
   diagnosticoHistory: (account: string) => get<any>(`/diagnostico/history?account=${account}`),
   diagnosticoById: (account: string, id: number | string) =>
     get<any>(`/diagnostico/${id}?account=${account}`),
+  adsActions: (params?: { account?: string; status?: string }) => {
+    const p = new URLSearchParams();
+    if (params?.account) p.set("account", params.account);
+    if (params?.status) p.set("status", params.status);
+    const query = p.toString();
+    return get<any>(`/ads-actions${query ? `?${query}` : ""}`);
+  },
+  proposeNegative: (body: { account: string; term: string; from?: string; to?: string; matchType?: string }) =>
+    post<any>("/ads-actions/propose-negative", body),
+  approveAdsAction: (id: string) => post<any>(`/ads-actions/${id}/approve`),
+  rejectAdsAction: (id: string) => post<any>(`/ads-actions/${id}/reject`),
 };
