@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { usePage } from "../lib/usePage";
 import { PageHeader, QueryState } from "../components/PageHeader";
@@ -75,6 +76,52 @@ function downloadNegativesCsv(rows: Row[]) {
   downloadCsv(`negativas-${new Date().toISOString().slice(0, 10)}.csv`, ["Campaign", "Keyword", "Match Type", "Level"], body);
 }
 
+// Botão(ões) para propor pausar/reativar direto no Google Ads (fila de
+// aprovação em Ações pendentes — nenhuma mutação sai daqui sem aprovação).
+// Campanhas têm status conhecido (ENABLED/PAUSED via dim_campaign), então
+// mostra um único botão que alterna; palavras-chave não têm status rastreado
+// no D1, então mostra as duas opções.
+function useProposeStatus(account: string) {
+  const [propostos, setPropostos] = useState<Record<string, string>>({});
+  const campanha = useMutation({
+    mutationFn: (v: { campaignId: string; status: "PAUSED" | "ENABLED" }) =>
+      api.proposeCampaignStatus({ account, ...v }),
+    onSuccess: (_d, v) => setPropostos((s) => ({ ...s, [`c:${v.campaignId}:${v.status}`]: "ok" })),
+    onError: (err: Error, v) => setPropostos((s) => ({ ...s, [`c:${v.campaignId}:${v.status}`]: err.message })),
+  });
+  const keyword = useMutation({
+    mutationFn: (v: { criterionId: string; status: "PAUSED" | "ENABLED" }) =>
+      api.proposeKeywordStatus({ account, ...v }),
+    onSuccess: (_d, v) => setPropostos((s) => ({ ...s, [`k:${v.criterionId}:${v.status}`]: "ok" })),
+    onError: (err: Error, v) => setPropostos((s) => ({ ...s, [`k:${v.criterionId}:${v.status}`]: err.message })),
+  });
+  return { propostos, campanha, keyword };
+}
+
+function StatusButton({
+  proposto,
+  pending,
+  label,
+  onClick,
+}: {
+  proposto: string | undefined;
+  pending: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  if (proposto === "ok") return <span className="text-xs text-emerald-600">Enviado p/ aprovação</span>;
+  if (proposto) return <span className="text-xs text-rose-600" title={proposto}>Erro</span>;
+  return (
+    <button
+      onClick={onClick}
+      disabled={pending}
+      className="rounded border border-slate-300 bg-white px-2 py-0.5 text-xs hover:bg-slate-50 disabled:opacity-50"
+    >
+      {label}
+    </button>
+  );
+}
+
 export function ReportPage({
   kind,
   title,
@@ -92,6 +139,48 @@ export function ReportPage({
   });
   const rows: Row[] = q.data?.rows ?? [];
   const cur = account?.currency ?? "BRL";
+  const { propostos, campanha, keyword } = useProposeStatus(f.account);
+
+  const actionCol: Column<Row> | null =
+    kind === "campaigns"
+      ? {
+          key: "ads_action",
+          header: "Google Ads",
+          render: (r) => {
+            if (r.status === "REMOVED") return "—";
+            const status: "PAUSED" | "ENABLED" = r.status === "PAUSED" ? "ENABLED" : "PAUSED";
+            return (
+              <StatusButton
+                proposto={propostos[`c:${r.key}:${status}`]}
+                pending={campanha.isPending}
+                label={status === "PAUSED" ? "Pausar" : "Reativar"}
+                onClick={() => campanha.mutate({ campaignId: r.key, status })}
+              />
+            );
+          },
+        }
+      : kind === "keywords"
+        ? {
+            key: "ads_action",
+            header: "Google Ads",
+            render: (r) => (
+              <div className="flex gap-1.5">
+                <StatusButton
+                  proposto={propostos[`k:${r.key}:PAUSED`]}
+                  pending={keyword.isPending}
+                  label="Pausar"
+                  onClick={() => keyword.mutate({ criterionId: r.key, status: "PAUSED" })}
+                />
+                <StatusButton
+                  proposto={propostos[`k:${r.key}:ENABLED`]}
+                  pending={keyword.isPending}
+                  label="Reativar"
+                  onClick={() => keyword.mutate({ criterionId: r.key, status: "ENABLED" })}
+                />
+              </div>
+            ),
+          }
+        : null;
 
   return (
     <div className="space-y-5">
@@ -126,6 +215,7 @@ export function ReportPage({
                 : kind === "keywords"
                   ? [...metricCols(cur), qualityCol()]
                   : metricCols(cur)),
+              ...(actionCol ? [actionCol] : []),
             ]}
           />
         </>

@@ -88,6 +88,10 @@ export const api = {
   },
   proposeNegative: (body: { account: string; term: string; from?: string; to?: string; matchType?: string }) =>
     post<any>("/ads-actions/propose-negative", body),
+  proposeCampaignStatus: (body: { account: string; campaignId: string; status: "PAUSED" | "ENABLED" }) =>
+    post<any>("/ads-actions/propose-campaign-status", body),
+  proposeKeywordStatus: (body: { account: string; criterionId: string; status: "PAUSED" | "ENABLED" }) =>
+    post<any>("/ads-actions/propose-keyword-status", body),
   approveAdsAction: (id: string) => post<any>(`/ads-actions/${id}/approve`),
   rejectAdsAction: (id: string) => post<any>(`/ads-actions/${id}/reject`),
 };

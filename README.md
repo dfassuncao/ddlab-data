@@ -116,6 +116,16 @@ Ads sem aprovação manual — fluxo:
 
 Usa as mesmas credenciais `GOOGLE_ADS_*` já configuradas para o
 `keyword_volume` (mesmo escopo OAuth `adwords`, que cobre leitura e escrita
-na API do Ads — não precisa de token/escopo novo). Próximas fases:
-pausar/reativar campanhas e palavras-chave, ajuste de orçamento/lances,
-criação de campanhas/anúncios.
+na API do Ads — não precisa de token/escopo novo).
+
+Fase 2: pausar/reativar campanhas e palavras-chave, mesmo padrão de fila:
+
+- Em **Campanhas**, cada linha ganha um botão único que alterna Pausar/Reativar
+  conforme o status atual (`dim_campaign.status`) — `POST /api/ads-actions/propose-campaign-status`.
+- Em **Palavras‑chave**, cada linha ganha os dois botões (não há status
+  rastreado no D1 para keyword) — `POST /api/ads-actions/propose-keyword-status`,
+  que acha o `ad_group_id`/campanha a partir do `criterion_id`.
+- Aprovar chama `worker/googleAds.ts#setCampaignStatus` (`campaigns:mutate`)
+  ou `#setKeywordStatus` (`adGroupCriteria:mutate`).
+
+Próximas fases: ajuste de orçamento/lances, criação de campanhas/anúncios.

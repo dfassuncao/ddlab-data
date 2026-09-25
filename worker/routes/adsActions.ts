@@ -3,7 +3,7 @@ import type { Env } from "../env";
 import type { AccessUser } from "../auth";
 import { getAccount } from "../db";
 import { resolveRange } from "../kpi";
-import { addCampaignNegativeKeywords } from "../googleAds";
+import { addCampaignNegativeKeywords, setCampaignStatus, setKeywordStatus, type EntityStatus } from "../googleAds";
 
 type Vars = { Variables: { user: AccessUser }; Bindings: Env };
 export const adsActions = new Hono<Vars>();
@@ -106,6 +106,87 @@ adsActions.post("/ads-actions/propose-negative", async (c) => {
   return c.json(serialize(row));
 });
 
+function parseStatus(raw: string | undefined): EntityStatus | null {
+  const s = raw?.toUpperCase();
+  return s === "PAUSED" || s === "ENABLED" ? s : null;
+}
+
+// Propõe pausar/reativar uma campanha inteira.
+adsActions.post("/ads-actions/propose-campaign-status", async (c) => {
+  const body = await c.req.json<{ account?: string; campaignId?: string; status?: string }>();
+  const accountId = body.account;
+  const campaignId = body.campaignId;
+  const status = parseStatus(body.status);
+  if (!accountId || !campaignId || !status) return c.json({ error: "account, campaignId e status (PAUSED/ENABLED) são obrigatórios" }, 400);
+
+  const account = await getAccount(c.env, accountId);
+  if (!account) return c.json({ error: "account not found" }, 404);
+
+  const rows = await q<{ name: string | null }>(
+    c.env,
+    `SELECT name FROM dim_campaign WHERE account_id = ? AND campaign_id = ?`,
+    [accountId, campaignId],
+  );
+  const nome = rows[0]?.name ?? campaignId;
+  const acao = status === "PAUSED" ? "Pausar" : "Reativar";
+  const description = `${acao} a campanha "${nome}"`;
+
+  const id = crypto.randomUUID();
+  const payload = { customerId: account.customer_id, campaignId, status };
+  await c.env.DB.prepare(
+    `INSERT INTO google_ads_actions (id, account_id, action_type, description, payload, status, requested_by)
+     VALUES (?, ?, 'campaign_status', ?, ?, 'pending', ?)`,
+  )
+    .bind(id, accountId, description, JSON.stringify(payload), c.get("user").email)
+    .run();
+
+  const row = (await q<ActionRow>(c.env, `SELECT * FROM google_ads_actions WHERE id = ?`, [id]))[0];
+  return c.json(serialize(row));
+});
+
+// Propõe pausar/reativar uma palavra-chave específica — acha o ad_group_id e
+// a campanha a partir do criterion_id (o front só precisa saber o criterion_id).
+adsActions.post("/ads-actions/propose-keyword-status", async (c) => {
+  const body = await c.req.json<{ account?: string; criterionId?: string; status?: string }>();
+  const accountId = body.account;
+  const criterionId = body.criterionId;
+  const status = parseStatus(body.status);
+  if (!accountId || !criterionId || !status) return c.json({ error: "account, criterionId e status (PAUSED/ENABLED) são obrigatórios" }, 400);
+
+  const account = await getAccount(c.env, accountId);
+  if (!account) return c.json({ error: "account not found" }, 404);
+
+  const rows = await q<{ keyword_text: string | null; ad_group_id: string; campaign_id: string }>(
+    c.env,
+    `SELECT keyword_text, ad_group_id, campaign_id FROM fact_keyword_daily
+     WHERE account_id = ? AND criterion_id = ? ORDER BY day DESC LIMIT 1`,
+    [accountId, criterionId],
+  );
+  if (rows.length === 0) return c.json({ error: "palavra-chave não encontrada" }, 404);
+  const kw = rows[0];
+
+  const campRows = await q<{ name: string | null }>(
+    c.env,
+    `SELECT name FROM dim_campaign WHERE account_id = ? AND campaign_id = ?`,
+    [accountId, kw.campaign_id],
+  );
+  const campanhaNome = campRows[0]?.name ?? kw.campaign_id;
+  const acao = status === "PAUSED" ? "Pausar" : "Reativar";
+  const description = `${acao} a palavra-chave "${kw.keyword_text ?? criterionId}" (campanha "${campanhaNome}")`;
+
+  const id = crypto.randomUUID();
+  const payload = { customerId: account.customer_id, adGroupId: kw.ad_group_id, criterionId, status };
+  await c.env.DB.prepare(
+    `INSERT INTO google_ads_actions (id, account_id, action_type, description, payload, status, requested_by)
+     VALUES (?, ?, 'keyword_status', ?, ?, 'pending', ?)`,
+  )
+    .bind(id, accountId, description, JSON.stringify(payload), c.get("user").email)
+    .run();
+
+  const row = (await q<ActionRow>(c.env, `SELECT * FROM google_ads_actions WHERE id = ?`, [id]))[0];
+  return c.json(serialize(row));
+});
+
 async function loadPending(env: Env, id: string): Promise<ActionRow | null> {
   const rows = await q<ActionRow>(env, `SELECT * FROM google_ads_actions WHERE id = ?`, [id]);
   return rows[0] ?? null;
@@ -126,22 +207,25 @@ adsActions.post("/ads-actions/:id/approve", async (c) => {
     .bind(reviewer, id)
     .run();
 
-  const payload = JSON.parse(action.payload) as {
-    customerId: string;
-    term: string;
-    matchType: "BROAD" | "PHRASE" | "EXACT";
-    campaigns: { id: string; name: string }[];
-  };
-
   try {
-    if (action.action_type !== "negative_keyword") {
+    const payload = JSON.parse(action.payload);
+    if (action.action_type === "negative_keyword") {
+      await addCampaignNegativeKeywords(
+        c.env,
+        payload.customerId,
+        payload.campaigns.map((cp: { id: string }) => ({
+          campaignId: cp.id,
+          keyword: payload.term,
+          matchType: payload.matchType,
+        })),
+      );
+    } else if (action.action_type === "campaign_status") {
+      await setCampaignStatus(c.env, payload.customerId, payload.campaignId, payload.status);
+    } else if (action.action_type === "keyword_status") {
+      await setKeywordStatus(c.env, payload.customerId, payload.adGroupId, payload.criterionId, payload.status);
+    } else {
       throw new Error(`action_type '${action.action_type}' ainda não é aplicável (fase futura)`);
     }
-    await addCampaignNegativeKeywords(
-      c.env,
-      payload.customerId,
-      payload.campaigns.map((cp) => ({ campaignId: cp.id, keyword: payload.term, matchType: payload.matchType })),
-    );
     await c.env.DB.prepare(`UPDATE google_ads_actions SET status='applied', applied_at=datetime('now') WHERE id=?`)
       .bind(id)
       .run();
