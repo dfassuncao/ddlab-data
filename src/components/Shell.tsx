@@ -11,9 +11,12 @@ const NUCLEO = [
   { to: "/acoes-pendentes", label: "Ações pendentes" },
 ];
 
-const RELATORIOS = [
+const RELATORIOS_GERAL = [
   { to: "/relatorios/visao-geral", label: "Visão geral" },
   { to: "/relatorios/analise-ia", label: "Análise IA (texto)" },
+];
+
+const RELATORIOS_ADS = [
   { to: "/relatorios/campaigns", label: "Campanhas" },
   { to: "/relatorios/keywords", label: "Palavras‑chave" },
   { to: "/relatorios/search-terms", label: "Termos de busca" },
@@ -23,26 +26,26 @@ const RELATORIOS = [
   { to: "/relatorios/audiences", label: "Públicos" },
   { to: "/relatorios/products", label: "Produtos" },
   { to: "/relatorios/landing-pages", label: "Landing pages" },
+];
+
+const RELATORIOS_ORGANICO = [
   { to: "/relatorios/search-console", label: "Search Console" },
   { to: "/relatorios/google-analytics", label: "Google Analytics" },
   { to: "/relatorios/classificacao-termos", label: "Classificação de termos" },
-  { to: "/relatorios/waste", label: "Desperdício" },
-  { to: "/relatorios/opportunities", label: "Oportunidades" },
-  { to: "/relatorios/apresentacao", label: "Apresentação" },
 ];
 
-function Section({
-  label,
-  items,
-  search,
-}: {
-  label: string;
-  items: { to: string; label: string; end?: boolean }[];
-  search: string;
-}) {
+const RELATORIOS_OTIMIZACAO = [
+  { to: "/relatorios/waste", label: "Desperdício" },
+  { to: "/relatorios/opportunities", label: "Oportunidades" },
+];
+
+const RELATORIOS_OUTROS = [{ to: "/relatorios/apresentacao", label: "Apresentação" }];
+
+type NavItem = { to: string; label: string; end?: boolean };
+
+function NavItems({ items, search }: { items: NavItem[]; search: string }) {
   return (
-    <div className="mb-4">
-      <div className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{label}</div>
+    <>
       {items.map((n) => (
         <NavLink
           key={n.to}
@@ -56,6 +59,40 @@ function Section({
         >
           {n.label}
         </NavLink>
+      ))}
+    </>
+  );
+}
+
+function Section({ label, items, search }: { label: string; items: NavItem[]; search: string }) {
+  return (
+    <div className="mb-4">
+      <div className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{label}</div>
+      <NavItems items={items} search={search} />
+    </div>
+  );
+}
+
+// "Relatórios" agrupa vários sub-temas (Google Ads, Orgânico/Analytics,
+// Otimização) — um cabeçalho secundário mais discreto separa cada um, sem
+// repetir o peso visual do cabeçalho principal da seção.
+function GroupedSection({
+  label,
+  groups,
+  search,
+}: {
+  label: string;
+  groups: { subLabel?: string; items: NavItem[] }[];
+  search: string;
+}) {
+  return (
+    <div className="mb-4">
+      <div className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{label}</div>
+      {groups.map((g, i) => (
+        <div key={g.subLabel ?? i} className={i > 0 ? "mt-2" : undefined}>
+          {g.subLabel && <div className="px-3 py-0.5 text-[10px] text-slate-400">{g.subLabel}</div>}
+          <NavItems items={g.items} search={search} />
+        </div>
       ))}
     </div>
   );
@@ -127,7 +164,17 @@ export function Shell() {
         {!collapsed && (
           <nav className="flex-1 overflow-y-auto px-2 py-2">
             <Section label="Núcleo" items={NUCLEO} search={search} />
-            <Section label="Relatórios" items={RELATORIOS} search={search} />
+            <GroupedSection
+              label="Relatórios"
+              groups={[
+                { items: RELATORIOS_GERAL },
+                { subLabel: "Google Ads", items: RELATORIOS_ADS },
+                { subLabel: "Orgânico & Analytics", items: RELATORIOS_ORGANICO },
+                { subLabel: "Otimização", items: RELATORIOS_OTIMIZACAO },
+                { items: RELATORIOS_OUTROS },
+              ]}
+              search={search}
+            />
             <Section label="" items={[{ to: "/configuracoes", label: "Configurações" }]} search={search} />
           </nav>
         )}
