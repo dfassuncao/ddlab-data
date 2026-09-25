@@ -146,10 +146,14 @@ adsActions.post("/ads-actions/:id/approve", async (c) => {
       .bind(id)
       .run();
   } catch (e) {
+    // A requisição em si teve sucesso (chegou até tentar a mutação no Ads) —
+    // só a mutação falhou. Devolve 200 com status='error' no corpo, não um
+    // 4xx/5xx: isso faz o frontend tratar como resposta válida e atualizar a
+    // lista mostrando o erro, em vez de descartar o corpo e travar a tela.
     const msg = e instanceof Error ? e.message : String(e);
     await c.env.DB.prepare(`UPDATE google_ads_actions SET status='error', error=? WHERE id=?`).bind(msg.slice(0, 1000), id).run();
     const row = await loadPending(c.env, id);
-    return c.json(serialize(row!), 502);
+    return c.json(serialize(row!));
   }
 
   const row = await loadPending(c.env, id);

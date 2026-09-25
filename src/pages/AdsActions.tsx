@@ -47,8 +47,16 @@ export function AdsActions() {
   });
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["ads-actions"] });
-  const approve = useMutation({ mutationFn: (id: string) => api.approveAdsAction(id), onSuccess: invalidate });
-  const reject = useMutation({ mutationFn: (id: string) => api.rejectAdsAction(id), onSuccess: invalidate });
+  const approve = useMutation({
+    mutationFn: (id: string) => api.approveAdsAction(id),
+    onSuccess: invalidate,
+    onError: invalidate,
+  });
+  const reject = useMutation({
+    mutationFn: (id: string) => api.rejectAdsAction(id),
+    onSuccess: invalidate,
+    onError: invalidate,
+  });
 
   const rows: ActionRow[] = q.data?.rows ?? [];
 
@@ -60,6 +68,13 @@ export function AdsActions() {
         accounts={accounts}
         f={f}
       />
+
+      {(approve.isError || reject.isError) && (
+        <p className="rounded-md bg-rose-50 px-3 py-2 text-xs text-rose-600">
+          Erro ao {approve.isError ? "aprovar" : "rejeitar"}:{" "}
+          {((approve.error ?? reject.error) as Error)?.message ?? "desconhecido"}
+        </p>
+      )}
 
       <div className="flex items-center gap-3">
         <select
