@@ -57,9 +57,10 @@ const KINDS: Record<string, ReportKind> = {
   },
   geo: {
     table: "fact_geo_daily f",
+    join: "LEFT JOIN dim_geo_target d ON d.location_id = f.location_id",
     groupBy: "f.location_id",
     keyCol: "f.location_id",
-    labelSql: "f.location_id",
+    labelSql: "COALESCE(d.name, f.location_id)",
   },
   ads: {
     table: "fact_ad_daily f",
@@ -287,8 +288,9 @@ reports.get("/waste", async (c) => {
   );
   const geo = await q(
     c.env,
-    `SELECT f.location_id AS label, SUM(f.cost) AS cost, SUM(f.clicks) AS clicks
-     FROM fact_geo_daily f WHERE f.account_id=? AND f.day>=? AND f.day<=?
+    `SELECT COALESCE(d.name, f.location_id) AS label, SUM(f.cost) AS cost, SUM(f.clicks) AS clicks
+     FROM fact_geo_daily f LEFT JOIN dim_geo_target d ON d.location_id = f.location_id
+     WHERE f.account_id=? AND f.day>=? AND f.day<=?
      GROUP BY f.location_id HAVING SUM(f.conversions)=0 AND SUM(f.cost)>0 ORDER BY cost DESC LIMIT 200`,
     binds,
   );
@@ -347,9 +349,10 @@ reports.get("/opportunities", async (c) => {
   );
   const scaleGeo = await q(
     c.env,
-    `SELECT f.location_id AS label, SUM(f.cost) AS cost, SUM(f.conversions) AS conversions,
+    `SELECT COALESCE(d.name, f.location_id) AS label, SUM(f.cost) AS cost, SUM(f.conversions) AS conversions,
        SUM(f.clicks) AS clicks
-     FROM fact_geo_daily f WHERE f.account_id=? AND f.day>=? AND f.day<=?
+     FROM fact_geo_daily f LEFT JOIN dim_geo_target d ON d.location_id = f.location_id
+     WHERE f.account_id=? AND f.day>=? AND f.day<=?
      GROUP BY f.location_id HAVING SUM(f.conversions) >= 1
      ORDER BY (SUM(f.conversions) / NULLIF(SUM(f.cost),0)) DESC LIMIT 50`,
     binds,

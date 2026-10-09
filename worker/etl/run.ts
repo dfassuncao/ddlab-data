@@ -6,6 +6,7 @@ import { runGa4 } from "./ga4";
 import { runGsc } from "./gsc";
 import { runKeywordVolume } from "./keywordVolume";
 import { runTermClassification } from "./termClassification";
+import { fetchGeoTargetNames } from "../googleAds";
 
 const NUM_COLS: Record<string, string[]> = {
   fact_campaign_daily: [
@@ -44,6 +45,25 @@ function toNum(v: unknown): number {
 function startDate(lookbackDays: number): string {
   const d = new Date(Date.now() - lookbackDays * 86_400_000);
   return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Resolve e cacheia em dim_geo_target os location_id ainda sem nome — chamado
+ * depois do fato "geo" rodar. geo_target_constant é global (não muda por
+ * conta), então cada ID só precisa ser resolvido uma vez na vida do projeto.
+ */
+async function resolveGeoTargetNames(env: Env, customerId: string): Promise<void> {
+  const { results } = await env.DB.prepare(
+    `SELECT DISTINCT g.location_id FROM fact_geo_daily g
+     LEFT JOIN dim_geo_target d ON d.location_id = g.location_id
+     WHERE d.location_id IS NULL AND g.location_id IS NOT NULL`,
+  ).all<{ location_id: string }>();
+  const ids = (results ?? []).map((r) => r.location_id).filter(Boolean);
+  if (ids.length === 0) return;
+
+  const names = await fetchGeoTargetNames(env, customerId, ids);
+  const rows = [...names.entries()].map(([location_id, name]) => ({ location_id, name }));
+  if (rows.length) await bulkInsert(env, "dim_geo_target", ["location_id", "name"], rows);
 }
 
 export interface EtlOptions {
@@ -148,6 +168,16 @@ export async function runEtl(env: Env, opts: EtlOptions = {}) {
         const { rows, from } = await runFact(env, spec, account, lookback);
         await writeMeta(account.id, spec.fact, "ok", rows, from, null);
         results.push({ account: account.id, fact: spec.fact, status: "ok", rows });
+        if (spec.fact === "geo") {
+          // Não falha o refresh por isso — é só enriquecimento de nome, não o
+          // dado em si (o Google Ads API ter uma falha aqui não deve derrubar
+          // o resto do ETL).
+          try {
+            await resolveGeoTargetNames(env, account.customer_id);
+          } catch (e) {
+            console.error("resolveGeoTargetNames falhou", e);
+          }
+        }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         await writeMeta(account.id, spec.fact, "error", 0, "", msg.slice(0, 500));
