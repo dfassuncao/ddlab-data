@@ -74,10 +74,13 @@ async function buildContext(env: Env, account: any, from: string, to: string) {
   const geoCross = await q<any>(
     env,
     `WITH ranked AS (
-       SELECT f.campaign_id, COALESCE(d.name, f.campaign_id) AS campanha, f.location_id AS local,
+       SELECT f.campaign_id, COALESCE(d.name, f.campaign_id) AS campanha,
+              COALESCE(g.name, f.location_id) AS local,
               SUM(f.cost) custo, SUM(f.conversions) conversoes,
               ROW_NUMBER() OVER (PARTITION BY f.campaign_id ORDER BY SUM(f.cost) DESC) rn
-       FROM fact_geo_daily f LEFT JOIN dim_campaign d ON d.account_id=f.account_id AND d.campaign_id=f.campaign_id
+       FROM fact_geo_daily f
+         LEFT JOIN dim_campaign d ON d.account_id=f.account_id AND d.campaign_id=f.campaign_id
+         LEFT JOIN dim_geo_target g ON g.location_id = f.location_id
        WHERE f.account_id=? AND f.day>=? AND f.day<=?
        GROUP BY f.campaign_id, f.location_id
      )
@@ -150,9 +153,10 @@ async function buildContext(env: Env, account: any, from: string, to: string) {
   );
   const wasteGeo = await q<any>(
     env,
-    `SELECT location_id AS label, SUM(cost) AS cost FROM fact_geo_daily
-     WHERE account_id=? AND day>=? AND day<=? GROUP BY location_id
-     HAVING SUM(conversions)=0 AND SUM(cost)>0 ORDER BY cost DESC LIMIT 10`,
+    `SELECT COALESCE(d.name, f.location_id) AS label, SUM(f.cost) AS cost
+     FROM fact_geo_daily f LEFT JOIN dim_geo_target d ON d.location_id = f.location_id
+     WHERE f.account_id=? AND f.day>=? AND f.day<=? GROUP BY f.location_id
+     HAVING SUM(f.conversions)=0 AND SUM(f.cost)>0 ORDER BY cost DESC LIMIT 10`,
     binds,
   );
   const desperdicio = [

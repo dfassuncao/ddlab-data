@@ -98,6 +98,18 @@ mês a mês. `keyword_volume` requer as 5 vars `GOOGLE_ADS_*` (ver DEPLOY.md);
 `ANTHROPIC_API_KEY` (Claude) ou `DEEPSEEK_API_KEY` (DeepSeek), conforme o
 campo "IA" da conta em Configurações.
 
+## Nomes de geografia
+
+`fact_geo_daily.location_id` vem da API só como `geoTargetConstants/<id>`
+(ex.: `geoTargetConstants/1001766`). O ETL do fato `geo` resolve o nome real
+(ex.: "Santos, São Paulo, Brazil") via Google Ads API (`geo_target_constant`,
+recurso global do Google — não muda por conta) e cacheia em `dim_geo_target`;
+cada ID só precisa ser resolvido uma vez na vida do projeto. Falha nessa
+resolução não derruba o refresh do fato `geo` em si — só fica sem nome até a
+próxima tentativa (volta a `location_id` cru como fallback em todo lugar que
+exibe geografia: relatório de Geografia, Desperdício, Oportunidades e o
+contexto enviado pra Análise/Diagnóstico IA).
+
 ## Integração de escrita com o Google Ads (Ações pendentes)
 
 Fase 1: negativar termos de busca. Nenhuma mutação é enviada para a API do

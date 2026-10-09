@@ -178,3 +178,52 @@ export async function setKeywordStatus(
     },
   ]);
 }
+
+/**
+ * Resolve o nome legível de Geo Target Constants (ex.: "geoTargetConstants/1001766"
+ * -> "Santos, São Paulo, Brazil") — a BigQuery Data Transfer só traz o ID.
+ * geo_target_constant é um recurso GLOBAL do Google (não muda por conta), então
+ * o resultado é cacheado em dim_geo_target e nunca precisa ser buscado de novo
+ * para o mesmo ID. customerId é só a conta usada para autenticar a chamada.
+ */
+export async function fetchGeoTargetNames(
+  env: Env,
+  customerId: string,
+  locationIds: string[],
+): Promise<Map<string, string>> {
+  if (!env.GOOGLE_ADS_DEVELOPER_TOKEN || !env.GOOGLE_ADS_CLIENT_ID || !env.GOOGLE_ADS_CLIENT_SECRET || !env.GOOGLE_ADS_REFRESH_TOKEN) {
+    throw new Error("Google Ads API não configurada");
+  }
+  const ids = [...new Set(locationIds.map((l) => l.replace("geoTargetConstants/", "")))].filter((id) =>
+    /^\d+$/.test(id),
+  );
+  const out = new Map<string, string>();
+  if (ids.length === 0) return out;
+
+  const token = await getGoogleAdsAccessToken(env);
+  for (const batch of chunk(ids, 500)) {
+    const res = await fetch(`https://googleads.googleapis.com/${API_VERSION}/customers/${customerId}/googleAds:search`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "developer-token": env.GOOGLE_ADS_DEVELOPER_TOKEN,
+        "login-customer-id": env.GOOGLE_ADS_LOGIN_CUSTOMER_ID ?? env.BQ_MCC_SUFFIX,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        query: `SELECT geo_target_constant.id, geo_target_constant.name
+                 FROM geo_target_constant
+                 WHERE geo_target_constant.id IN (${batch.join(",")})`,
+      }),
+    });
+    const json = (await res.json()) as any;
+    if (!res.ok) {
+      throw new Error(`Google Ads API ${res.status}: ${JSON.stringify(json.error ?? json)}`);
+    }
+    for (const r of json.results ?? []) {
+      const gtc = r.geoTargetConstant;
+      if (gtc?.id != null && gtc.name) out.set(`geoTargetConstants/${gtc.id}`, gtc.name);
+    }
+  }
+  return out;
+}
