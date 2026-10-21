@@ -47,7 +47,7 @@ BORDER = colors.HexColor("#E2E8F0")
 BG_SOFT = colors.HexColor("#F8FAFC")
 PROJECT_NAME = "ddlab-data"
 REPORT_TITLE = f"Relatório de Auditoria de Segurança — {PROJECT_NAME}"
-REPORT_DATE = "09 de setembro de 2026"
+REPORT_DATE = "21 de outubro de 2026 (2ª rodada — atualização)"
 
 # ---------------------------------------------------------------------------
 # Dados da auditoria
@@ -56,66 +56,24 @@ REPORT_DATE = "09 de setembro de 2026"
 FINDINGS = [
     {
         "id": "F1",
-        "categoria": "Isolamento / mecanismo de tranca",
-        "severidade": "critica",
-        "arquivo": "worker/auth.ts:88-94 (+ wrangler.toml:29-31)",
-        "titulo": "Autenticação falha aberta (fail-open) quando CF_ACCESS_TEAM_DOMAIN/CF_ACCESS_AUD não estão configurados",
-        "descricao": (
-            "accessMiddleware() só valida o JWT do Cloudflare Access se as vars "
-            "CF_ACCESS_TEAM_DOMAIN e CF_ACCESS_AUD estiverem preenchidas. Se qualquer uma "
-            "estiver vazia — que é exatamente o valor commitado em wrangler.toml (linhas 30-31, "
-            "CF_ACCESS_TEAM_DOMAIN = \"\" e CF_ACCESS_AUD = \"\") — a verificação é pulada "
-            "inteiramente e o usuário vira { email: \"dev@localhost\" } com acesso total, "
-            "sem exigir nenhuma credencial."
-        ),
-        "trecho": (
-            'if (!CF_ACCESS_TEAM_DOMAIN || !CF_ACCESS_AUD) {\n'
-            '  c.set("user", { email: "dev@localhost" });\n'
-            '  return next();\n'
-            '}'
-        ),
-        "explorabilidade": (
-            "Condição de exploração: deploy feito antes do passo 4 do DEPLOY.md (criar a "
-            "Cloudflare Access Application e rodar `wrangler secret put CF_ACCESS_TEAM_DOMAIN/AUD`), "
-            "ou qualquer redeploy que rode `wrangler deploy` sem os secrets aplicados (os secrets não "
-            "são reaplicados automaticamente e o `[vars]` do wrangler.toml sobrescreve com string vazia "
-            "os nomes homônimos se alguém mover para vars por engano). Nesse cenário a aplicação inteira "
-            "— dados de custo/receita/conversão de 5 contas de clientes reais, edição de metas e "
-            "orçamento, criação de anotações e disparo de refresh pago — fica acessível sem login a "
-            "qualquer pessoa na internet que descubra a URL do Worker."
-        ),
-        "impacto": (
-            "Exposição total e não autenticada de dados de negócio de clientes da agência (Google Ads "
-            "+ GA4: investimento, receita, conversões, briefing confidencial do cliente) e escrita "
-            "irrestrita (alterar metas de CPA/orçamento, disparar ETL pago no BigQuery, gerar análises "
-            "pagas via API da Anthropic)."
-        ),
-        "correcao": (
-            "Tratar CF_ACCESS_TEAM_DOMAIN/AUD ausentes como erro de configuração em produção, não como "
-            "bypass: checar `c.env.ENVIRONMENT` (ou similar) e só permitir o fallback dev@localhost fora "
-            "de produção; em produção, retornar 500 (fail-closed) se as vars estiverem vazias. Adicionar "
-            "validação de startup que rejeite o deploy/serve se essas vars estiverem vazias em ambiente "
-            "não-dev."
-        ),
-    },
-    {
-        "id": "F2",
         "categoria": "Permissão / autorização",
         "severidade": "alta",
         "arquivo": (
-            "worker/routes/reports.ts:438-491, worker/index.ts:41-53, "
-            "worker/routes/analysis.ts:367-442"
+            "worker/routes/reports.ts:753-803, worker/routes/adsActions.ts:60-261, "
+            "worker/routes/analysis.ts:375-511, worker/index.ts:50-64"
         ),
-        "titulo": "Ausência total de RBAC — qualquer usuário autenticado tem acesso irrestrito de leitura e escrita a todas as contas de clientes",
+        "titulo": "Ausência total de RBAC — qualquer usuário autenticado tem acesso irrestrito de leitura e escrita a todas as contas de clientes, incluindo mutações reais no Google Ads",
         "descricao": (
             "Não existe conceito de papel (admin/editor/leitor) nem de dono de conta em nenhuma "
-            "camada do backend. accessMiddleware() só verifica \"é um e-mail permitido pela policy do "
-            "Cloudflare Access\" — a partir daí, o mesmo usuário pode ler dados de TODAS as 5 contas "
-            "(GET /api/report/*, /api/overview, /api/waste, /api/opportunities, /api/decision-center), "
-            "editar metas/orçamento/briefing de qualquer conta (POST /api/settings/account), criar "
-            "anotações em nome de qualquer conta (POST /api/annotations), disparar ETL pago para "
-            "qualquer conta (POST /api/refresh) e gerar análises de IA pagas para qualquer conta "
-            "(POST /api/analysis, POST /api/diagnostico). Não há checagem de posse — é tudo-ou-nada."
+            "camada do backend (confirmado: nenhuma ocorrência de role/isAdmin/canEdit em worker/ ou "
+            "src/). accessMiddleware() só verifica \"é um e-mail permitido pela policy do Cloudflare "
+            "Access\" (DEPLOY.md linha 91: `@ddlab.com.br` ou e-mails individuais) — a partir daí, o "
+            "mesmo usuário pode ler dados de todas as contas, editar metas/orçamento/briefing "
+            "(POST /api/settings/account), disparar ETL pago para qualquer conta (POST /api/refresh), "
+            "gerar análises de IA pagas (POST /api/analysis, /api/diagnostico) e — desde a integração "
+            "de escrita com o Google Ads (Fases 1 e 2) — propor E aprovar mutações reais em qualquer "
+            "conta: negativar termos, pausar/reativar campanhas e palavras-chave "
+            "(worker/routes/adsActions.ts). Não há checagem de posse — é tudo-ou-nada."
         ),
         "trecho": (
             "reports.post(\"/settings/account\", async (c) => {\n"
@@ -123,40 +81,91 @@ FINDINGS = [
             "  if (!body.id) return c.json({ error: \"id obrigatório\" }, 400);\n"
             "  await c.env.DB.prepare(`UPDATE dim_account SET ... WHERE id = ?`)...\n"
             "  // nenhuma verificação de quem pode editar a conta `body.id`\n"
+            "});\n\n"
+            "adsActions.post(\"/ads-actions/:id/approve\", async (c) => {\n"
+            "  // qualquer usuário autenticado aprova a mutação de QUALQUER conta\n"
+            "  await addCampaignNegativeKeywords(c.env, payload.customerId, ...);\n"
             "});"
         ),
         "explorabilidade": (
-            "Sempre explorável por qualquer conta liberada na policy do Cloudflare Access (hoje: "
-            "dfassuncao@gmail.com e/ou @ddlab.com.br, conforme DEPLOY.md). É um risco aceitável se o "
-            "produto é deliberadamente \"ferramenta interna de agência, todo colaborador vê tudo\" — mas "
-            "isso não está documentado como decisão de produto em lugar nenhum, e cresce de risco assim "
-            "que a policy do Access for ampliada (ex.: incluir um cliente final, um estagiário, um "
-            "freelancer pontual)."
+            "Sempre explorável por qualquer conta liberada na policy do Cloudflare Access. Era um "
+            "risco de exposição de dados/custo na 1ª rodada da auditoria; com a integração de escrita "
+            "do Google Ads (commits #36-#38) o mesmo modelo tudo-ou-nada agora também cobre ações com "
+            "efeito direto em campanhas reais de clientes (pausar campanha, negativar termo), o que "
+            "amplia o dano possível de um acesso indevido ou de um colaborador despreparado. Ainda não "
+            "documentado como decisão de produto deliberada em lugar nenhum do repositório."
         ),
         "impacto": (
-            "Qualquer pessoa com acesso à ferramenta pode alterar configurações financeiras de qualquer "
-            "cliente, disparar custos reais (BigQuery, Anthropic) em qualquer conta, e ver o briefing "
-            "confidencial de todos os clientes da agência — não apenas dos que gerencia."
+            "Qualquer pessoa com acesso à ferramenta pode alterar configurações financeiras de "
+            "qualquer cliente, pausar campanhas ou negativar termos na conta de Google Ads real de "
+            "qualquer cliente, disparar custos reais (BigQuery, Anthropic, Google Ads API) em qualquer "
+            "conta, e ver o briefing confidencial de todos os clientes da agência — não apenas dos que "
+            "gerencia."
         ),
         "correcao": (
             "Definir explicitamente o modelo de autorização: se for intencional (equipe interna "
-            "enxuta), documentar a decisão; se não, adicionar uma tabela de vínculo usuário↔conta (ou "
-            "papel) e checar posse em cada endpoint de escrita antes de aplicar a mutação."
+            "enxuta), documentar a decisão formalmente (ex.: no README/DEPLOY.md); se não, adicionar "
+            "uma tabela de vínculo usuário↔conta (ou papel) e checar posse em cada endpoint de escrita "
+            "— com prioridade para os endpoints de /ads-actions, que movem dinheiro de clientes de "
+            "verdade."
+        ),
+    },
+    {
+        "id": "F2",
+        "categoria": "Permissão / autorização",
+        "severidade": "media",
+        "arquivo": "worker/routes/adsActions.ts:197-245",
+        "titulo": "Fluxo de aprovação de mutações no Google Ads não exige segregação entre quem propõe e quem aprova (sem maker-checker)",
+        "descricao": (
+            "POST /api/ads-actions/:id/approve só verifica se a ação ainda está `pending` — não "
+            "compara `action.requested_by` com `c.get(\"user\").email`. O mesmo usuário que cria a "
+            "proposta (negativar termo, pausar campanha/palavra-chave) pode aprová-la sozinho e "
+            "disparar a mutação real no Google Ads (`addCampaignNegativeKeywords`/`setCampaignStatus`/"
+            "`setKeywordStatus` em worker/googleAds.ts) sem qualquer segunda pessoa revisar. A fila de "
+            "aprovação existe para dar visibilidade humana antes da mutação, mas nada no backend impede "
+            "que essa revisão seja feita pela mesma pessoa que propôs."
+        ),
+        "trecho": (
+            "adsActions.post(\"/ads-actions/:id/approve\", async (c) => {\n"
+            "  const action = await loadPending(c.env, id);\n"
+            "  if (action.status !== \"pending\") return c.json({ error: ... }, 400);\n"
+            "  // sem comparar action.requested_by com c.get(\"user\").email\n"
+            "  const reviewer = c.get(\"user\").email;\n"
+            "  await c.env.DB.prepare(`UPDATE google_ads_actions SET status='approved', reviewed_by=? ...`)\n"
+            "});"
+        ),
+        "explorabilidade": (
+            "Sempre explorável por qualquer usuário autenticado — basta chamar propose-* e depois "
+            "approve com a própria sessão. Mitigado em parte por F1 já afetar o mesmo grupo de "
+            "usuários (equipe DDLab), mas é um controle de processo que a própria feature (uma fila de "
+            "aprovação) sugere ter a intenção de prover e hoje não provê."
+        ),
+        "impacto": (
+            "Erro humano ou ação indevida de um único colaborador pode pausar uma campanha ou "
+            "negativar um termo relevante em produção, no Google Ads real do cliente, sem nenhuma "
+            "segunda revisão — o que é justamente o cenário que a fila de aprovação foi desenhada para "
+            "evitar."
+        ),
+        "correcao": (
+            "Registrar `requested_by` e comparar com o usuário autenticado em /approve; se forem "
+            "iguais, exigir uma segunda pessoa (retornar 403) ou, no mínimo, sinalizar claramente no "
+            "frontend/log que a ação foi auto-aprovada, para decisão consciente da agência sobre se "
+            "isso é aceitável."
         ),
     },
     {
         "id": "F3",
         "categoria": "Chaves/controles expostos ou inertes",
         "severidade": "alta",
-        "arquivo": "worker/index.ts:41-53, .dev.vars.example:15-16",
+        "arquivo": "worker/index.ts:50-64, .dev.vars.example:15-16",
         "titulo": "Endpoint POST /api/refresh dispara custo real (BigQuery) sem limite de taxa; a proteção REFRESH_TOKEN documentada nunca é verificada no código",
         "descricao": (
             ".dev.vars.example documenta REFRESH_TOKEN como \"Token simples para proteger POST "
-            "/api/refresh quando chamado fora do Access\", e Env.REFRESH_TOKEN existe em worker/env.ts:15. "
+            "/api/refresh quando chamado fora do Access\", e Env.REFRESH_TOKEN existe em worker/env.ts:19. "
             "Porém nenhum arquivo do worker lê ou compara REFRESH_TOKEN — o handler `app.post(\"/api/refresh\", "
-            "...)` em worker/index.ts:41 dispara `runEtl()` (que consulta o BigQuery, custo real por bytes "
+            "...)` em worker/index.ts:50 dispara `runEtl()` (que consulta o BigQuery, custo real por bytes "
             "processados) sem checar esse token nem qualquer outro controle além do accessMiddleware() "
-            "genérico, e sem rate limiting."
+            "genérico, e sem rate limiting. Sem mudança desde a 1ª rodada da auditoria."
         ),
         "trecho": (
             'app.post("/api/refresh", async (c) => {\n'
@@ -167,12 +176,13 @@ FINDINGS = [
             "});"
         ),
         "explorabilidade": (
-            "Explorável por qualquer usuário autenticado (ou, combinado com F1, por qualquer visitante "
-            "não autenticado): chamadas repetidas a /api/refresh?days=400 para as 5 contas geram "
-            "consultas pesadas e repetidas ao BigQuery (a doc do próprio README/DEPLOY recomenda "
-            "backfill de 400 dias), inflando a fatura do GCP sem limite."
+            "Explorável por qualquer usuário autenticado: chamadas repetidas a /api/refresh?days=400 "
+            "para todas as contas geram consultas pesadas e repetidas ao BigQuery (a doc do próprio "
+            "README/DEPLOY recomenda backfill de 400 dias), inflando a fatura do GCP sem limite. O "
+            "mesmo vale para `?facts=term_classification`/`keyword_volume`, que consomem quota da API "
+            "do Google Ads e da API da Anthropic/Gemini/DeepSeek (o próprio README alerta sobre isso)."
         ),
-        "impacto": "Consumo de custo (billing do GCP/BigQuery) fora de controle, possível esgotamento de cota.",
+        "impacto": "Consumo de custo (billing do GCP/BigQuery/Anthropic/Google Ads API) fora de controle, possível esgotamento de cota.",
         "correcao": (
             "Implementar de fato a checagem de REFRESH_TOKEN (ou removê-la da documentação se não for "
             "usada) e adicionar rate limiting/debounce por conta (ex.: recusar novo refresh se um já "
@@ -181,42 +191,9 @@ FINDINGS = [
     },
     {
         "id": "F4",
-        "categoria": "Inputs sem tratamento",
-        "severidade": "media",
-        "arquivo": "src/pages/ReportPage.tsx:52-68",
-        "titulo": "Exportação CSV de negativas não neutraliza injeção de fórmula (CSV/Excel formula injection)",
-        "descricao": (
-            "downloadNegativesCsv() escapa aspas duplas nos campos `label` (termo de busca) e "
-            "`campaign`, mas não verifica se o valor começa com `=`, `+`, `-` ou `@` — caracteres que o "
-            "Excel/Google Sheets interpretam como início de fórmula. `label` nesse relatório vem de "
-            "`search_term` do Google Ads (fact_searchterm_daily), que por sua vez reflete termos de "
-            "busca reais digitados por usuários — um dado de origem externa que a agência não controla "
-            "totalmente."
-        ),
-        "trecho": (
-            "const term = String(r.label ?? \"\").replace(/\"/g, '\"\"');\n"
-            "const camp = String(r.campaign ?? \"\").replace(/\"/g, '\"\"');\n"
-            "return `\"${camp}\",\"${term}\",Phrase,Campaign`;"
-        ),
-        "explorabilidade": (
-            "Exige que (a) um termo de busca real acionando os anúncios do cliente contenha uma "
-            "fórmula válida de planilha logo no início do texto — algo incomum mas não impossível de "
-            "ser induzido por um agente malicioso pesquisando termos elaborados —, e (b) o operador da "
-            "DDLab abra o CSV exportado no Excel/Sheets com fórmulas habilitadas. Severidade limitada "
-            "pela baixa probabilidade de ambas condições, mas o padrão de exportação deveria ser seguro "
-            "por padrão."
-        ),
-        "impacto": "Execução de fórmula/DDE ao abrir o CSV no Excel, potencialmente levando a exfiltração de dados locais ou execução de comando (dependendo da configuração do Excel do operador).",
-        "correcao": (
-            "Prefixar com um apóstrofo (ou aspas simples neutralizando) qualquer campo que comece com "
-            "`=`, `+`, `-` ou `@` antes de montar a linha CSV, tanto para `label` quanto `campaign`."
-        ),
-    },
-    {
-        "id": "F5",
         "categoria": "Superfície de informação",
         "severidade": "baixa",
-        "arquivo": "worker/index.ts:23-38",
+        "arquivo": "worker/index.ts:23-39",
         "titulo": "GET /api/introspect expõe o schema interno do BigQuery (nomes de coluna/tabela) para qualquer usuário autenticado",
         "descricao": (
             "O endpoint de depuração /api/introspect roda `SELECT column_name, data_type FROM "
@@ -224,7 +201,7 @@ FINDINGS = [
             "Está corretamente sob accessMiddleware() e o parâmetro `table` é validado por regex "
             "(`^[a-zA-Z0-9_]+$`) antes de entrar na query (sem SQL injection), mas é uma rota de "
             "debug interno deixada acessível em produção para qualquer usuário do Access, não só para "
-            "quem ajusta o ETL."
+            "quem ajusta o ETL. Sem mudança desde a 1ª rodada da auditoria."
         ),
         "trecho": (
             'app.get("/api/introspect", async (c) => {\n'
@@ -241,10 +218,32 @@ FINDINGS = [
 
 STRENGTHS = [
     {
+        "titulo": "RESOLVIDO desde a 1ª rodada — autenticação do Cloudflare Access não falha mais aberta quando a configuração está ausente",
+        "evidencia": (
+            "O achado crítico F1 da auditoria anterior (fail-open quando CF_ACCESS_TEAM_DOMAIN/AUD "
+            "estavam vazios e commitados em [vars]) está corrigido: wrangler.toml não declara mais "
+            "essas duas chaves em [vars] (comentário explícito nas linhas 32-40 do porquê), e "
+            "worker/auth.ts:97-104 agora retorna 500 fail-closed sempre que `c.env.ENVIRONMENT === "
+            "\"production\"` e as vars estiverem ausentes — o fallback `dev@localhost` só é possível "
+            "fora de produção. DEPLOY.md documenta a decisão (linhas 111-151) e scripts/deploy.sh "
+            "reaplica os dois secrets a cada deploy para evitar regressão."
+        ),
+    },
+    {
+        "titulo": "RESOLVIDO desde a 1ª rodada — exportação CSV neutraliza injeção de fórmula (CSV/Excel formula injection)",
+        "evidencia": (
+            "O achado F4 da auditoria anterior está corrigido: src/lib/csv.ts:1-6 agora tem um "
+            "`csvField()` central que prefixa com apóstrofo qualquer valor iniciando com `=`, `+`, `-` "
+            "ou `@` antes de montar a linha CSV, e tanto `downloadNegativesCsv` (ReportPage.tsx) quanto "
+            "`exportCsv` (TermClassification.tsx) foram migrados para usar o `downloadCsv()` compartilhado "
+            "— não há mais um caminho de exportação que monte a linha CSV manualmente."
+        ),
+    },
+    {
         "titulo": "Todas as queries ao D1 usam parâmetros bind (?), sem concatenação de entrada do usuário em SQL",
         "evidencia": (
-            "Verificado em worker/routes/reports.ts, analysis.ts, decision.ts e rules.ts — o helper "
-            "`q(env, sql, binds)` sempre usa `.bind(...binds)`. Os únicos identificadores de "
+            "Verificado em worker/routes/reports.ts, analysis.ts, decision.ts, adsActions.ts e rules.ts "
+            "— o helper `q(env, sql, binds)` sempre usa `.bind(...binds)`. Os únicos identificadores de "
             "tabela/coluna interpolados diretamente no SQL vêm de mapas estáticos no código "
             "(`KINDS` em reports.ts, `FACTS` em etl/queries.ts), nunca de query string ou body do "
             "usuário."
@@ -255,24 +254,26 @@ STRENGTHS = [
         "evidencia": (
             "worker/etl/ga4.ts:5,90-92 valida `ga4_dataset` e cada item de `ga4_key_events` (campos "
             "editáveis em Configurações) com o regex `^[a-zA-Z0-9_]+$` (safeIdent) antes de usá-los na "
-            "montagem da query GA4; `customer_id` é passado como parâmetro nomeado `@customer_id` do "
-            "BigQuery (worker/etl/run.ts:60-63), não concatenado."
+            "montagem da query GA4; mesmo padrão em worker/etl/gsc.ts:5,59 para `gsc_dataset`. "
+            "`customer_id` é passado como parâmetro nomeado do BigQuery, não concatenado."
         ),
     },
     {
-        "titulo": "Segredos reais nunca foram commitados no repositório",
+        "titulo": "Segredos reais nunca foram commitados no repositório (confirmado novamente nesta rodada)",
         "evidencia": (
             ".gitignore exclui .dev.vars, service-account*.json, *.key.json e o padrão específico do "
-            "arquivo baixado do GCP (studio-*-*.json). `git log --all -p` não retornou nenhuma chave "
-            "privada, API key ou token real — apenas o placeholder \"...\" em .dev.vars.example. "
-            "Segredos (GCP_SA_KEY, ANTHROPIC_API_KEY, CF_ACCESS_*) são aplicados via `wrangler secret "
-            "put`, fora do controle de versão."
+            "arquivo baixado do GCP (studio-*-*.json, *-de430-*.json). `git log --all -p | grep -i "
+            "\"PRIVATE KEY|AIzaSy|sk-ant|GCP_SA_KEY=\"` não retornou nenhuma chave privada, API key ou "
+            "token real em nenhum commit do histórico — apenas o placeholder \"...\" em "
+            ".dev.vars.example. Segredos (GCP_SA_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY, "
+            "DEEPSEEK_API_KEY, GOOGLE_ADS_*, CF_ACCESS_*) são todos aplicados via `wrangler secret "
+            "put`, fora do controle de versão — nenhum deles aparece em wrangler.toml [vars]."
         ),
     },
     {
         "titulo": "Verificação de JWT do Cloudflare Access implementada corretamente quando configurada",
         "evidencia": (
-            "worker/auth.ts:58-86 valida assinatura RS256 contra o JWKS público do Access "
+            "worker/auth.ts:60-87 valida assinatura RS256 contra o JWKS público do Access "
             "(cache de 1h), expiração (`exp`) e audience (`aud`, aceitando array ou string) antes de "
             "aceitar o token — nenhuma dessas checagens é pulada quando as vars estão presentes."
         ),
@@ -282,26 +283,36 @@ STRENGTHS = [
         "evidencia": (
             "src/pages/AiAnalysis.tsx usa `<ReactMarkdown remarkPlugins={[remarkGfm]}>` sem o plugin "
             "`rehype-raw` — por padrão o react-markdown NÃO renderiza tags HTML embutidas no texto, "
-            "apenas Markdown. Busca em todo `src/` por `dangerouslySetInnerHTML`/`innerHTML` não "
-            "encontrou nenhum outro ponto de renderização de HTML não confiável."
+            "apenas Markdown. Busca em todo `src/` por `dangerouslySetInnerHTML`/`innerHTML`/`eval`/"
+            "`new Function` não encontrou nenhum ponto de renderização de HTML não confiável."
         ),
     },
     {
-        "titulo": "Geração de JWT para a service account do GCP usa Web Crypto nativa, sem expor a chave privada em logs",
+        "titulo": "Integração de escrita com o Google Ads valida entrada com whitelist antes de montar a mutação, e o payload da mutação é gerado no servidor, não recebido do cliente",
+        "evidencia": (
+            "worker/routes/adsActions.ts valida `matchType` contra [\"BROAD\",\"PHRASE\",\"EXACT\"] e "
+            "`status` contra PAUSED/ENABLED antes de persistir a proposta; o `customerId` usado na "
+            "mutação vem de `getAccount()` (nunca do body da requisição), e o payload gravado em "
+            "`google_ads_actions` no momento do /propose-* é o mesmo lido e enviado no /approve — o "
+            "cliente não pode alterar o alvo da mutação entre propor e aprovar."
+        ),
+    },
+    {
+        "titulo": "Geração de JWT para a service account do GCP e chamadas OAuth2 do Google Ads usam Web Crypto nativa, sem expor chave/token em logs",
         "evidencia": (
             "worker/bq.ts:30-78 assina o JWT com `crypto.subtle.sign` e cacheia apenas o access "
-            "token (não a chave privada) em memória do isolate, com expiração controlada."
+            "token (não a chave privada) em memória do isolate, com expiração controlada; "
+            "worker/googleAds.ts:9-30 segue o mesmo padrão de cache de token para o OAuth2 do Google Ads."
         ),
     },
 ]
 
 RECOMMENDATIONS = [
-    ("P1", "Corrigir o fail-open de autenticação (F1): produção nunca deve rodar sem CF_ACCESS_TEAM_DOMAIN/AUD válidos.", "critica"),
-    ("P1", "Implementar de fato a checagem de REFRESH_TOKEN e/ou rate limiting em POST /api/refresh (F3).", "alta"),
-    ("P2", "Decidir e documentar o modelo de autorização (uso interno total-acesso vs. RBAC por conta) e implementar checagem de posse se não for total-acesso deliberado (F2).", "alta"),
-    ("P2", "Neutralizar injeção de fórmula na exportação CSV de negativas (F4).", "media"),
-    ("P3", "Restringir /api/introspect a ambiente de desenvolvimento/staging (F5).", "baixa"),
-    ("P3", "Adicionar teste automatizado que falhe o build/deploy se CF_ACCESS_TEAM_DOMAIN/AUD estiverem vazios em modo produção.", "informativa"),
+    ("P1", "Implementar de fato a checagem de REFRESH_TOKEN e/ou rate limiting em POST /api/refresh (F3) — agora cobre também quota de Google Ads API e Anthropic/Gemini/DeepSeek.", "alta"),
+    ("P1", "Decidir e documentar o modelo de autorização (uso interno total-acesso vs. RBAC por conta) e, no mínimo, priorizar checagem de posse nos endpoints de /ads-actions, que movem dinheiro real de clientes (F1).", "alta"),
+    ("P2", "Adicionar segregação entre quem propõe e quem aprova uma mutação no Google Ads, ou documentar que a auto-aprovação é aceita pela agência (F2).", "media"),
+    ("P3", "Restringir /api/introspect a ambiente de desenvolvimento/staging (F4).", "baixa"),
+    ("P3", "Adicionar teste automatizado que falhe o build/deploy se CF_ACCESS_TEAM_DOMAIN/AUD estiverem vazios em modo produção (consolidar a correção do antigo F1).", "informativa"),
 ]
 
 ISSUES_MD = []  # preenchido abaixo
@@ -343,12 +354,11 @@ def build_issue(finding):
     return f"[Segurança] {finding['titulo']}", body
 
 
-# Agrupar F1 (fail-open) sozinho por criticidade; agrupar F3+F5 (controles de admin/debug) numa issue única de tema.
+# Agrupar F1 (RBAC) sozinho; F2 (maker-checker) sozinho; F3+F4 (controles de admin/debug) numa issue única de tema.
 ISSUE_GROUPS = [
     ("issue-1", [FINDINGS[0]]),
     ("issue-2", [FINDINGS[1]]),
-    ("issue-3", [FINDINGS[2], FINDINGS[4]]),  # refresh sem token + introspect exposto: mesmo tema (rotas administrativas/debug sem controle extra)
-    ("issue-4", [FINDINGS[3]]),
+    ("issue-3", [FINDINGS[2], FINDINGS[3]]),  # refresh sem token + introspect exposto: mesmo tema (rotas administrativas/debug sem controle extra)
 ]
 
 
@@ -557,14 +567,20 @@ story.append(NextPageTemplate("Normal"))
 story.append(Spacer(1, 8.6 * cm))
 story.append(Paragraph("Escopo auditado", styles["H2"]))
 story.append(Paragraph(
-    "Repositório <b>dfassuncao/ddlab-data</b> (branch de trabalho "
-    "<font face='Courier'>claude/ddlab-security-analysis-ter837</font>): aplicação interna da agência "
-    "DDLab para inteligência de campanhas Google Ads/GA4 — Cloudflare Worker (Hono) como backend/API, "
-    "SPA React como frontend, Cloudflare D1 (SQLite) como banco pré-agregado, BigQuery como fonte de "
-    "dados e Cloudflare Access como camada de login. Todos os arquivos de <font face='Courier'>worker/</font>, "
-    "<font face='Courier'>src/</font>, <font face='Courier'>shared/</font>, <font face='Courier'>migrations/</font> "
-    "e arquivos de configuração/deploy (wrangler.toml, DEPLOY.md, .dev.vars.example, package.json) foram "
-    "revisados; o histórico completo do git foi varrido em busca de segredos commitados.",
+    "Repositório <b>dfassuncao/ddlab-data</b> (branch <font face='Courier'>main</font>, HEAD "
+    "06d80a4): aplicação interna da agência DDLab para inteligência de campanhas Google Ads/GA4/"
+    "Search Console — Cloudflare Worker (Hono) como backend/API, SPA React como frontend, Cloudflare "
+    "D1 (SQLite) como banco pré-agregado, BigQuery como fonte de dados, Cloudflare Access como camada "
+    "de login, e uma integração de escrita com a Google Ads API (negativar termos, pausar/reativar "
+    "campanhas e palavras-chave, Fases 1 e 2, commits #36-#38) adicionada desde a 1ª rodada desta "
+    "auditoria. Todos os arquivos de <font face='Courier'>worker/</font> (incluindo as rotas novas "
+    "<font face='Courier'>routes/adsActions.ts</font> e <font face='Courier'>googleAds.ts</font>), "
+    "<font face='Courier'>src/</font>, <font face='Courier'>shared/</font>, "
+    "<font face='Courier'>migrations/</font> e arquivos de configuração/deploy (wrangler.toml, "
+    "DEPLOY.md, .dev.vars.example, package.json, scripts/deploy.sh) foram revisados; o histórico "
+    "completo do git foi varrido novamente em busca de segredos commitados. Esta é a <b>2ª rodada</b> "
+    "da auditoria — os achados F1 e F4 da rodada anterior (fail-open de autenticação e injeção de "
+    "fórmula em CSV) foram verificados como corrigidos e migraram para a seção de pontos fortes.",
     styles["Body"]))
 story.append(Spacer(1, 8))
 story.append(Paragraph("Nota metodológica — mapeamento das 5 categorias para esta stack", styles["H2"]))
@@ -629,13 +645,16 @@ story.append(top_row)
 
 story.append(Spacer(1, 10))
 story.append(Paragraph(
-    f"A auditoria percorreu 100% dos handlers de rota do backend (worker/index.ts e worker/routes/*.ts), "
-    f"o middleware de autenticação, a camada de acesso a dados (D1 e BigQuery), o ETL e os pontos de "
-    f"renderização do frontend. Foram identificados <b>{len(FINDINGS)} achados</b> — destaque para "
-    f"<b>F1 (crítico)</b>: a autenticação do Cloudflare Access falha aberta quando as variáveis de "
-    f"configuração não estão presentes, e esse é justamente o valor commitado por padrão no repositório. "
-    f"Como pontos fortes, o código evita consistentemente SQL injection (D1 e BigQuery) e XSS via HTML "
-    f"bruto, e nenhum segredo real foi encontrado no histórico do git.",
+    f"A auditoria percorreu 100% dos handlers de rota do backend (worker/index.ts e worker/routes/*.ts, "
+    f"incluindo a rota nova de ações no Google Ads), o middleware de autenticação, a camada de acesso a "
+    f"dados (D1 e BigQuery), o ETL, a integração de escrita com a Google Ads API e os pontos de "
+    f"renderização do frontend. Foram identificados <b>{len(FINDINGS)} achados</b> nesta rodada — "
+    f"destaque para <b>F1 (alta)</b>: a ausência de RBAC agora também cobre mutações reais em contas de "
+    f"clientes no Google Ads, não só leitura de dados. Os dois achados críticos/médios da rodada "
+    f"anterior (autenticação fail-open e injeção de fórmula em CSV) foram verificados como corrigidos. "
+    f"Como pontos fortes, o código continua evitando consistentemente SQL injection (D1 e BigQuery) e "
+    f"XSS via HTML bruto, a nova integração de escrita valida entrada por whitelist, e nenhum segredo "
+    f"real foi encontrado no histórico do git.",
     styles["Body"]))
 
 story.append(PageBreak())
@@ -655,10 +674,12 @@ for s in STRENGTHS:
 story.append(Spacer(1, 6))
 story.append(Paragraph("Pontos fracos (riscos centrais)", styles["H1"]))
 story.append(Paragraph(
-    "O risco central é estrutural: o mecanismo único de \"tranca\" (Cloudflare Access) pode falhar aberto "
-    "por configuração ausente (F1), e, mesmo quando ligado, não há segunda camada de autorização — todo "
-    "usuário autenticado é, na prática, administrador de todas as contas de todos os clientes (F2), "
-    "incluindo a capacidade de gerar custo real em serviços pagos de terceiros sem controle adicional (F3).",
+    "O risco central é estrutural: não há segunda camada de autorização além do Cloudflare Access — "
+    "todo usuário autenticado é, na prática, administrador de todas as contas de todos os clientes "
+    "(F1), incluindo a capacidade de aprovar sozinho mutações reais no Google Ads que ele mesmo propôs "
+    "(F2) e de gerar custo real em serviços pagos de terceiros sem controle adicional (F3). O mecanismo "
+    "de autenticação em si (fail-open) e a exportação CSV (injeção de fórmula) — os dois riscos mais "
+    "graves da rodada anterior — já foram corrigidos.",
     styles["Body"]))
 
 story.append(PageBreak())

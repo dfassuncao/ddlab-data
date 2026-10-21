@@ -1,12 +1,13 @@
 import { Hono } from "hono";
 import type { Env } from "./env";
-import { accessMiddleware, type AccessUser } from "./auth";
+import { accessMiddleware, requireAdmin, type AccessUser } from "./auth";
 import { reports } from "./routes/reports";
 import { analysis } from "./routes/analysis";
 import { decision } from "./routes/decision";
 import { adsActions } from "./routes/adsActions";
 import { runEtl } from "./etl/run";
 import { runQuery } from "./bq";
+import { checkRateLimit } from "./db";
 
 type Vars = { Variables: { user: AccessUser }; Bindings: Env };
 
@@ -20,8 +21,9 @@ app.use("/api/*", accessMiddleware());
 
 app.get("/api/me", (c) => c.json(c.get("user")));
 
-// Descobrir nomes reais de colunas (para ajustar as queries do ETL).
-app.get("/api/introspect", async (c) => {
+// Descobrir nomes reais de colunas (para ajustar as queries do ETL) — expõe
+// nome de tabela/coluna do BigQuery, então só para quem está em ADMIN_EMAILS.
+app.get("/api/introspect", requireAdmin(), async (c) => {
   const table = c.req.query("table");
   if (!table || !/^[a-zA-Z0-9_]+$/.test(table)) return c.json({ error: "?table inválido" }, 400);
   try {
@@ -47,7 +49,11 @@ app.get("/api/introspect", async (c) => {
 const SYNC_FACTS = new Set(["term_classification", "keyword_volume"]);
 
 // Refresh manual (backfill sob demanda). ?account=&days=&facts=campaign,keyword
-app.post("/api/refresh", async (c) => {
+// Dispara custo real (BigQuery/Ads/IA) — só ADMIN_EMAILS, e no máximo 1x/minuto.
+app.post("/api/refresh", requireAdmin(), async (c) => {
+  const allowed = await checkRateLimit(c.env, "refresh", 60_000);
+  if (!allowed) return c.json({ error: "refresh manual já disparado há menos de 1 minuto — aguarde" }, 429);
+
   const account = c.req.query("account") || undefined;
   const days = c.req.query("days") ? Number(c.req.query("days")) : undefined;
   const facts = c.req.query("facts")?.split(",").filter(Boolean);

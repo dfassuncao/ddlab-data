@@ -13,10 +13,13 @@ export interface Env {
   DEEPSEEK_MODEL?: string;
   /** "production" em produção (wrangler.toml). Ausente em dev local (.dev.vars não define). */
   ENVIRONMENT?: string;
+  /** E-mails autorizados a aprovar/rejeitar ações no Ads, mudar settings de conta,
+   *  disparar refresh manual e usar /api/introspect — separados por vírgula. Ver
+   *  requireAdmin() em worker/auth.ts. Vazio/ausente bloqueia essas ações (fail-closed). */
+  ADMIN_EMAILS?: string;
 
   // secrets
   GCP_SA_KEY: string;
-  REFRESH_TOKEN?: string;
   ANTHROPIC_API_KEY?: string;
   GEMINI_API_KEY?: string;
   DEEPSEEK_API_KEY?: string;

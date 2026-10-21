@@ -16,11 +16,12 @@ BQ_MCC_SUFFIX=9123420378
 CF_ACCESS_TEAM_DOMAIN=
 CF_ACCESS_AUD=
 
-# REFRESH_TOKEN: existe no código (worker/env.ts) mas NÃO é validado em nenhum
-# lugar hoje — não depende dele para proteger /api/refresh (isso fica só atrás
-# do Cloudflare Access). Deixe vazio; ver achado F3 da auditoria de segurança
-# em docs/security-audit/ se for implementar de fato.
-REFRESH_TOKEN=
+# ADMIN_EMAILS: e-mails (separados por vírgula) autorizados a aprovar/rejeitar
+# ações no Google Ads, mudar settings de conta, disparar /api/refresh manual e
+# usar /api/introspect — ver worker/auth.ts requireAdmin(). Vazio bloqueia
+# essas ações em produção (fail-closed); em dev local sem Access configurado,
+# o usuário "dev@localhost" passa sem precisar disso.
+ADMIN_EMAILS=
 
 # Análise IA / Diagnóstico IA / Classificação de termos. Provedor padrão é o
 # Gemini (mais barato); Claude e DeepSeek ficam disponíveis por conta em

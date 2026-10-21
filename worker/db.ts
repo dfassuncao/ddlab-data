@@ -33,6 +33,23 @@ export async function getAccount(env: Env, id: string): Promise<Account | null> 
   return all.find((a) => a.id === id) ?? null;
 }
 
+/**
+ * Rate limit simples por chave, em D1 (sem KV neste Worker). Retorna false se
+ * a última chamada com essa chave foi há menos de minIntervalMs — quem chama
+ * deve então recusar a operação (ex.: 429) em vez de executá-la.
+ */
+export async function checkRateLimit(env: Env, key: string, minIntervalMs: number): Promise<boolean> {
+  const row = await env.DB.prepare(`SELECT last_at FROM rate_limits WHERE key = ?`).bind(key).first<{ last_at: string }>();
+  const now = Date.now();
+  if (row && now - new Date(row.last_at).getTime() < minIntervalMs) return false;
+  await env.DB.prepare(
+    `INSERT INTO rate_limits (key, last_at) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET last_at = excluded.last_at`,
+  )
+    .bind(key, new Date(now).toISOString())
+    .run();
+  return true;
+}
+
 /** Divide um array em pedaços de tamanho n. */
 export function chunk<T>(arr: T[], n: number): T[][] {
   const out: T[][] = [];

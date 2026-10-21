@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Env } from "../env";
-import type { AccessUser } from "../auth";
+import { requireAdmin, type AccessUser } from "../auth";
 import { getAccount } from "../db";
 import { resolveRange } from "../kpi";
 import { addCampaignNegativeKeywords, setCampaignStatus, setKeywordStatus, type EntityStatus } from "../googleAds";
@@ -194,13 +194,18 @@ async function loadPending(env: Env, id: string): Promise<ActionRow | null> {
 
 // Aprovar = a única forma de uma mutação sair daqui e chegar no Google Ads de
 // verdade. Aplica na hora (síncrono) e já devolve o resultado real (applied/error).
-adsActions.post("/ads-actions/:id/approve", async (c) => {
+// Restrito a ADMIN_EMAILS, e quem propôs a ação não pode ser quem aprova
+// (maker-checker) — mesmo estando em ADMIN_EMAILS.
+adsActions.post("/ads-actions/:id/approve", requireAdmin(), async (c) => {
   const id = c.req.param("id");
   const action = await loadPending(c.env, id);
   if (!action) return c.json({ error: "ação não encontrada" }, 404);
   if (action.status !== "pending") return c.json({ error: `ação já está '${action.status}'` }, 400);
 
   const reviewer = c.get("user").email;
+  if (action.requested_by && action.requested_by.toLowerCase() === reviewer.toLowerCase()) {
+    return c.json({ error: "quem propôs a ação não pode aprová-la — peça para outra pessoa revisar" }, 403);
+  }
   await c.env.DB.prepare(
     `UPDATE google_ads_actions SET status='approved', reviewed_by=?, reviewed_at=datetime('now') WHERE id=?`,
   )
@@ -244,7 +249,7 @@ adsActions.post("/ads-actions/:id/approve", async (c) => {
   return c.json(serialize(row!));
 });
 
-adsActions.post("/ads-actions/:id/reject", async (c) => {
+adsActions.post("/ads-actions/:id/reject", requireAdmin(), async (c) => {
   const id = c.req.param("id");
   const action = await loadPending(c.env, id);
   if (!action) return c.json({ error: "ação não encontrada" }, 404);

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Env } from "../env";
-import type { AccessUser } from "../auth";
+import { requireAdmin, type AccessUser } from "../auth";
 import { getAccount } from "../db";
 import { withKpis, resolveRange, previousRange, round } from "../kpi";
 
@@ -750,7 +750,7 @@ reports.post("/annotations", async (c) => {
   return c.json({ ok: true });
 });
 
-reports.post("/settings/account", async (c) => {
+reports.post("/settings/account", requireAdmin(), async (c) => {
   const body = await c.req.json<{
     id: string;
     target_cpa?: number | null;

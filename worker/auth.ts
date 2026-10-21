@@ -1,4 +1,4 @@
-import type { Context, Next } from "hono";
+import type { Context, MiddlewareHandler, Next } from "hono";
 import type { Env } from "./env";
 
 /**
@@ -85,6 +85,35 @@ export async function verifyAccess(
   if (aud && !audMatch) throw new Error("aud mismatch");
 
   return { email: payload.email ?? "unknown", name: payload.name };
+}
+
+/**
+ * Gate para ações sensíveis (mutação real no Google Ads, configuração de
+ * conta, refresh manual, introspecção de schema) — Access só garante que é
+ * alguém do time; isso aqui garante que é alguém autorizado a esse tipo de
+ * ação específica. Lista vem de ADMIN_EMAILS (var, e-mails separados por
+ * vírgula). Fail-closed: lista vazia/ausente bloqueia em vez de liberar.
+ */
+export function requireAdmin<P extends string = string>(): MiddlewareHandler<
+  { Bindings: Env; Variables: { user: AccessUser } },
+  P
+> {
+  return async (c, next) => {
+    const email = c.get("user").email.toLowerCase();
+    // Mesmo relaxamento do accessMiddleware em dev local sem Access configurado.
+    if (email === "dev@localhost" && c.env.ENVIRONMENT !== "production") return next();
+    const allow = (c.env.ADMIN_EMAILS ?? "")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+    if (allow.length === 0) {
+      return c.json({ error: "ADMIN_EMAILS não configurado — ação bloqueada por segurança" }, 403);
+    }
+    if (!allow.includes(email)) {
+      return c.json({ error: "ação restrita a administradores" }, 403);
+    }
+    return next();
+  };
 }
 
 export function accessMiddleware() {
